@@ -11,12 +11,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/jacky/nba-exchange/backend/internal/config"
-	"github.com/jacky/nba-exchange/backend/internal/db"
-	"github.com/jacky/nba-exchange/backend/internal/handler"
-	"github.com/jacky/nba-exchange/backend/internal/middleware"
-	"github.com/jacky/nba-exchange/backend/internal/repository"
-	"github.com/jacky/nba-exchange/backend/internal/service"
+	"github.com/jacky/hoop-exchange/backend/internal/cache"
+	"github.com/jacky/hoop-exchange/backend/internal/config"
+	"github.com/jacky/hoop-exchange/backend/internal/db"
+	"github.com/jacky/hoop-exchange/backend/internal/handler"
+	"github.com/jacky/hoop-exchange/backend/internal/middleware"
+	"github.com/jacky/hoop-exchange/backend/internal/repository"
+	"github.com/jacky/hoop-exchange/backend/internal/service"
 )
 
 func main() {
@@ -49,7 +50,8 @@ func main() {
 	portfolioSvc := service.NewPortfolioService(positionRepo, playerRepo, walletRepo)
 
 	authH := handler.NewAuthHandler(userRepo)
-	playerH := handler.NewPlayerHandler(playerRepo)
+	playersCache := cache.NewTTL(30 * time.Second)
+	playerH := handler.NewPlayerHandler(playerRepo, playersCache)
 	tradingH := handler.NewTradingHandler(tradingSvc)
 	portfolioH := handler.NewPortfolioHandler(portfolioSvc, orderRepo, tradeRepo)
 	indexH := handler.NewIndexHandler(indexRepo)

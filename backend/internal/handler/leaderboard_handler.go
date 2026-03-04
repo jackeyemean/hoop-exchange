@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jacky/nba-exchange/backend/internal/repository"
+	"github.com/jacky/hoop-exchange/backend/internal/repository"
 )
 
 type LeaderboardHandler struct {

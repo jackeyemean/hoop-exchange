@@ -1,19 +1,22 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jacky/nba-exchange/backend/internal/repository"
+	"github.com/jacky/hoop-exchange/backend/internal/cache"
+	"github.com/jacky/hoop-exchange/backend/internal/repository"
 )
 
 type PlayerHandler struct {
 	Players *repository.PlayerRepository
+	Cache   *cache.TTL
 }
 
-func NewPlayerHandler(players *repository.PlayerRepository) *PlayerHandler {
-	return &PlayerHandler{Players: players}
+func NewPlayerHandler(players *repository.PlayerRepository, c *cache.TTL) *PlayerHandler {
+	return &PlayerHandler{Players: players, Cache: c}
 }
 
 func (h *PlayerHandler) ListActive(c *gin.Context) {
@@ -27,13 +30,25 @@ func (h *PlayerHandler) ListActive(c *gin.Context) {
 		seasonID, _ = h.Players.GetActiveSeasonID(c.Request.Context())
 	}
 
+	cacheKey := fmt.Sprintf("players:%d", seasonID)
+	if h.Cache != nil {
+		if cached, ok := h.Cache.Get(cacheKey); ok {
+			c.JSON(http.StatusOK, cached)
+			return
+		}
+	}
+
 	players, err := h.Players.ListActiveWithPrices(c.Request.Context(), seasonID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch players"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"players": players})
+	resp := gin.H{"players": players}
+	if h.Cache != nil {
+		h.Cache.Set(cacheKey, resp)
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *PlayerHandler) GetDetail(c *gin.Context) {

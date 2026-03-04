@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jacky/nba-exchange/backend/internal/repository"
+	"github.com/jacky/hoop-exchange/backend/internal/repository"
 )
 
 type PortfolioPosition struct {

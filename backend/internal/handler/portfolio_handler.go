@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/jacky/nba-exchange/backend/internal/repository"
-	"github.com/jacky/nba-exchange/backend/internal/service"
+	"github.com/jacky/hoop-exchange/backend/internal/repository"
+	"github.com/jacky/hoop-exchange/backend/internal/service"
 )
 
 type PortfolioHandler struct {

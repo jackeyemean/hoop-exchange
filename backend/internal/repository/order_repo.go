@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jacky/nba-exchange/backend/internal/model"
+	"github.com/jacky/hoop-exchange/backend/internal/model"
 )
 
 type OrderRepository struct {

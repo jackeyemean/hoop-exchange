@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/jacky/nba-exchange/backend/internal/repository"
+	"github.com/jacky/hoop-exchange/backend/internal/repository"
 	"github.com/MicahParks/keyfunc/v3"
 )
 
