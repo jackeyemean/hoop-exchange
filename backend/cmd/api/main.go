@@ -24,6 +24,9 @@ func main() {
 	if err != nil {
 		log.Fatal("load config: ", err)
 	}
+	if cfg.SupabaseJWTSecret == "" && cfg.SupabaseURL == "" {
+		log.Fatal("SUPABASE_JWT_SECRET or SUPABASE_URL is required for auth")
+	}
 
 	ctx := context.Background()
 
@@ -42,11 +45,10 @@ func main() {
 	indexRepo := repository.NewIndexRepository(pool)
 	leaderboardRepo := repository.NewLeaderboardRepository(pool)
 
-	authSvc := service.NewAuthService(userRepo, walletRepo, cfg.JWTSecret, cfg.StartingBalance)
 	tradingSvc := service.NewTradingService(pool)
 	portfolioSvc := service.NewPortfolioService(positionRepo, playerRepo, walletRepo)
 
-	authH := handler.NewAuthHandler(authSvc)
+	authH := handler.NewAuthHandler(userRepo)
 	playerH := handler.NewPlayerHandler(playerRepo)
 	tradingH := handler.NewTradingHandler(tradingSvc)
 	portfolioH := handler.NewPortfolioHandler(portfolioSvc, orderRepo, tradeRepo)
@@ -73,12 +75,6 @@ func main() {
 
 	api := r.Group("/api")
 	{
-		auth := api.Group("/auth")
-		{
-			auth.POST("/register", authH.Register)
-			auth.POST("/login", authH.Login)
-		}
-
 		api.GET("/players", playerH.ListActive)
 		api.GET("/players/:id", playerH.GetDetail)
 
@@ -88,8 +84,9 @@ func main() {
 		api.GET("/leaderboard", leaderboardH.GetLeaderboard)
 
 		protected := api.Group("")
-		protected.Use(middleware.AuthRequired(cfg.JWTSecret))
+		protected.Use(middleware.AuthRequired(cfg.SupabaseJWTSecret, cfg.SupabaseURL, userRepo, walletRepo, cfg.StartingBalance))
 		{
+			protected.GET("/auth/me", authH.Me)
 			protected.POST("/orders",
 				abuseGuard.Middleware(),
 				middleware.MarketOpen(

@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jacky/nba-exchange/backend/internal/model"
 )
@@ -34,7 +36,7 @@ func (r *UserRepository) Create(ctx context.Context, email, username, passwordHa
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	user := &model.User{}
 	err := r.Pool.QueryRow(ctx,
-		`SELECT id, email, username, password_hash, created_at
+		`SELECT id, email, username, COALESCE(password_hash, ''), created_at
 		 FROM users WHERE email = $1`,
 		email,
 	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.CreatedAt)
@@ -47,7 +49,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*model.U
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	user := &model.User{}
 	err := r.Pool.QueryRow(ctx,
-		`SELECT id, email, username, password_hash, created_at
+		`SELECT id, email, username, COALESCE(password_hash, ''), created_at
 		 FROM users WHERE id = $1`,
 		id,
 	).Scan(&user.ID, &user.Email, &user.Username, &user.PasswordHash, &user.CreatedAt)
@@ -55,4 +57,41 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User
 		return nil, fmt.Errorf("get user by id: %w", err)
 	}
 	return user, nil
+}
+
+// CreateOAuth creates a user from OAuth (Google) - no password.
+// On username conflict (rare when emails truncate identically), falls back to user_<id>.
+func (r *UserRepository) CreateOAuth(ctx context.Context, id uuid.UUID, email, username string) error {
+	_, err := r.Pool.Exec(ctx,
+		`INSERT INTO users (id, email, username, password_hash)
+		 VALUES ($1, $2, $3, NULL)
+		 ON CONFLICT (id) DO NOTHING`,
+		id, email, username,
+	)
+	if err != nil {
+		// Retry with unique username on conflict (e.g. two emails truncate to same 50 chars)
+		if isUniqueViolation(err) {
+			fallback := "user_" + id.String()[:8]
+			_, err2 := r.Pool.Exec(ctx,
+				`INSERT INTO users (id, email, username, password_hash)
+				 VALUES ($1, $2, $3, NULL)
+				 ON CONFLICT (id) DO NOTHING`,
+				id, email, fallback,
+			)
+			if err2 != nil {
+				return fmt.Errorf("create oauth user: %w", err2)
+			}
+			return nil
+		}
+		return fmt.Errorf("create oauth user: %w", err)
+	}
+	return nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505" // unique_violation
+	}
+	return false
 }

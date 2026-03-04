@@ -8,10 +8,11 @@ import (
 )
 
 type Config struct {
-	DatabaseURL string
-	APIPort     string
-	WSPort      string
-	JWTSecret   string
+	DatabaseURL       string
+	APIPort           string
+	WSPort            string
+	SupabaseJWTSecret string // Legacy HS256 secret (optional if using JWKS)
+	SupabaseURL       string // e.g. https://xxx.supabase.co - for JWKS (RS256) verification
 
 	MarketOpenHour    int
 	MarketOpenMinute  int
@@ -30,7 +31,8 @@ func Load() (*Config, error) {
 		DatabaseURL: envOrDefault("DATABASE_URL", "postgres://nbaexchange:nbaexchange@localhost:5432/nbaexchange?sslmode=disable"),
 		APIPort:     envOrDefault("API_PORT", "8080"),
 		WSPort:         envOrDefault("WS_PORT", "8081"),
-		JWTSecret:      envOrDefault("JWT_SECRET", "change-me-in-production"),
+		SupabaseJWTSecret: envOrDefault("SUPABASE_JWT_SECRET", ""),
+		SupabaseURL:       envOrDefault("SUPABASE_URL", ""),
 		MarketTimezone: envOrDefault("MARKET_TIMEZONE", "America/New_York"),
 	}
 

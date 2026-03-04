@@ -91,7 +91,8 @@ func (r *LeaderboardRepository) GetLive(ctx context.Context, limit int) ([]model
 			return nil, fmt.Errorf("scan live leaderboard: %w", err)
 		}
 		s.UserID = userID
-		s.Rank = &rank
+		r := rank
+		s.Rank = &r
 		rank++
 		results = append(results, s)
 	}

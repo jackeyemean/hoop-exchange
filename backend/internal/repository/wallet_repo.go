@@ -31,6 +31,20 @@ func (r *WalletRepository) Create(ctx context.Context, userID uuid.UUID, initial
 	return wallet, nil
 }
 
+// CreateIfNotExists creates a wallet with initial balance only if one doesn't exist (idempotent).
+func (r *WalletRepository) CreateIfNotExists(ctx context.Context, userID uuid.UUID, initialBalance float64) error {
+	_, err := r.Pool.Exec(ctx,
+		`INSERT INTO wallets (user_id, balance)
+		 VALUES ($1, $2)
+		 ON CONFLICT (user_id) DO NOTHING`,
+		userID, initialBalance,
+	)
+	if err != nil {
+		return fmt.Errorf("create wallet if not exists: %w", err)
+	}
+	return nil
+}
+
 func (r *WalletRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (*model.Wallet, error) {
 	wallet := &model.Wallet{}
 	err := r.Pool.QueryRow(ctx,

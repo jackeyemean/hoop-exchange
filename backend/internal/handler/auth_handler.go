@@ -4,61 +4,47 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jacky/nba-exchange/backend/internal/service"
+	"github.com/google/uuid"
+	"github.com/jacky/nba-exchange/backend/internal/repository"
 )
 
 type AuthHandler struct {
-	Auth *service.AuthService
+	Users *repository.UserRepository
 }
 
-func NewAuthHandler(auth *service.AuthService) *AuthHandler {
-	return &AuthHandler{Auth: auth}
+func NewAuthHandler(users *repository.UserRepository) *AuthHandler {
+	return &AuthHandler{Users: users}
 }
 
-type registerRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Username string `json:"username" binding:"required,min=3,max=50"`
-	Password string `json:"password" binding:"required,min=6"`
-}
-
-type loginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
-}
-
-type authResponse struct {
-	Token   string `json:"token"`
+type meResponse struct {
+	ID       string `json:"id"`
+	Email    string `json:"email"`
 	Username string `json:"username"`
 }
 
-func (h *AuthHandler) Register(c *gin.Context) {
-	var req registerRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// Me returns the current user (requires valid Supabase JWT via AuthRequired).
+func (h *AuthHandler) Me(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authenticated"})
 		return
 	}
 
-	token, err := h.Auth.Register(c.Request.Context(), req.Email, req.Username, req.Password)
+	uid, ok := userID.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user id"})
+		return
+	}
+
+	user, err := h.Users.GetByID(c.Request.Context(), uid)
 	if err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, authResponse{Token: token, Username: req.Username})
-}
-
-func (h *AuthHandler) Login(c *gin.Context) {
-	var req loginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	token, username, err := h.Auth.LoginWithUsername(c.Request.Context(), req.Email, req.Password)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, authResponse{Token: token, Username: username})
+	c.JSON(http.StatusOK, meResponse{
+		ID:       user.ID.String(),
+		Email:    user.Email,
+		Username: user.Username,
+	})
 }

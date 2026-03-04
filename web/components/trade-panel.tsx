@@ -35,22 +35,14 @@ export function TradePanel({
           Trade {playerName}
         </h3>
         <p className="mb-4 text-sm text-neutral-500">
-          Log in or sign up to buy and sell shares.
+          Log in to buy and sell shares.
         </p>
-        <div className="flex gap-2">
-          <Link
-            href="/login"
-            className="flex-1 rounded-md bg-neutral-900 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-          >
-            Log in
-          </Link>
-          <Link
-            href="/register"
-            className="flex-1 rounded-md border border-neutral-200 py-2.5 text-center text-sm font-semibold transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
-          >
-            Sign up
-          </Link>
-        </div>
+        <Link
+          href="/login"
+          className="block rounded-md bg-neutral-900 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+        >
+          Log in with Google
+        </Link>
       </div>
     );
   }

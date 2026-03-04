@@ -44,18 +44,8 @@ class ApiClient {
   }
 
   // Auth
-  register(email: string, username: string, password: string) {
-    return this.request<{ token: string }>("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify({ email, username, password }),
-    });
-  }
-
-  login(email: string, password: string) {
-    return this.request<{ token: string; username: string }>("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
+  getMe() {
+    return this.request<{ id: string; email: string; username: string }>("/api/auth/me");
   }
 
   // Players

@@ -28,20 +28,12 @@ export default function PortfolioPage() {
           <p className="mb-4 text-neutral-500">
             Log in to view your portfolio and trading history.
           </p>
-          <div className="flex justify-center gap-3">
-            <Link
-              href="/login"
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/register"
-              className="rounded-md border border-neutral-200 px-4 py-2 text-sm font-semibold hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
-            >
-              Sign up
-            </Link>
-          </div>
+          <Link
+            href="/login"
+            className="inline-block rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+          >
+            Log in with Google
+          </Link>
         </div>
       </div>
     );

@@ -19,6 +19,7 @@ migrations/ → PostgreSQL schema
 |---|---|
 | Frontend | Next.js, TypeScript, Tailwind CSS, Recharts |
 | API / Trading | Go (Gin), PostgreSQL |
+| Auth | Supabase (Google OAuth) |
 | Ingestion | Python, nba_api, basketball_reference_web_scraper |
 | Pricing | Python (scheduled worker) |
 
@@ -64,16 +65,30 @@ psql $DATABASE_URL -f migrations/002_game_stats_wl.up.sql
 psql $DATABASE_URL -f migrations/003_index_history_precision.up.sql
 psql $DATABASE_URL -f migrations/004_index_ticker_and_types.up.sql
 psql $DATABASE_URL -f migrations/005_renaissance_ipo_index.up.sql
+psql $DATABASE_URL -f migrations/006_oauth_users.up.sql
 ```
 
-### 3. Set up environment
+### 3. Set up Supabase Auth (Google)
+
+1. Create a [Supabase project](https://supabase.com/dashboard) (or use existing).
+2. In Supabase Dashboard: **Authentication** → **Providers** → enable **Google**. Add your Google OAuth Client ID and Secret from [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
+3. Add redirect URL: `https://your-domain.com/auth/callback` (and `http://localhost:3000/auth/callback` for local dev).
+4. Copy **JWT Secret** from **Project Settings** → **API** → **JWT Secret**.
+
+### 4. Set up environment
 
 ```bash
 cp .env.example .env
 # Edit .env with your values
 ```
 
-### 4. Start the Python engine
+**Required env vars:**
+- `DATABASE_URL` – PostgreSQL connection string (can use Supabase Postgres)
+- `SUPABASE_JWT_SECRET` – From Supabase Dashboard → Project Settings → API
+- `NEXT_PUBLIC_SUPABASE_URL` – Supabase project URL (frontend)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` – Supabase anon key (frontend)
+
+### 5. Start the Python engine
 
 ```bash
 cd engine
@@ -87,7 +102,7 @@ python main.py rebalance --season 2025-26
 
 **Recommended:** Run `tier-bootstrap` after sync-all. It assigns performance-based tiers (from prior-season ranking), computes historical prices, and initializes indexes. Tiers are **never** overwritten by sync-all—`sync_players` preserves existing tiers and only updates team/roster.
 
-### 5. Start the Go API
+### 6. Start the Go API
 
 ```bash
 cd backend
@@ -95,7 +110,7 @@ go mod tidy
 go run cmd/api/main.go
 ```
 
-### 6. Start the frontend
+### 7. Start the frontend
 
 ```bash
 cd web
@@ -107,8 +122,7 @@ npm run dev
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | /api/auth/register | No | Create account |
-| POST | /api/auth/login | No | Login |
+| GET | /api/auth/me | Yes | Current user (requires Supabase JWT) |
 | GET | /api/players | No | List all players with prices |
 | GET | /api/players/:id | No | Player detail + price history |
 | POST | /api/orders | Yes | Place buy/sell order |

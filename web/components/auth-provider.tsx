@@ -8,6 +8,7 @@ import {
   useCallback,
 } from "react";
 import { api } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 type AuthContextValue = {
   isLoggedIn: boolean;
@@ -27,18 +28,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
 
-  useEffect(() => {
-    const token = api.getToken();
-    const storedUsername = typeof window !== "undefined" ? localStorage.getItem("username") : null;
-    setIsLoggedIn(!!token);
-    setUsername(storedUsername);
-  }, []);
-
-  const login = useCallback((token: string, u?: string) => {
+  const login = useCallback(async (token: string, u?: string) => {
     api.setToken(token);
-    if (u) localStorage.setItem("username", u);
+    if (u) {
+      localStorage.setItem("username", u);
+      setUsername(u);
+    } else {
+      try {
+        const me = await api.getMe();
+        if (me) {
+          localStorage.setItem("username", me.username);
+          setUsername(me.username);
+        }
+      } catch {
+        setUsername(localStorage.getItem("username"));
+      }
+    }
     setIsLoggedIn(true);
-    setUsername(u || localStorage.getItem("username"));
   }, []);
 
   const logout = useCallback(() => {
@@ -46,7 +52,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("username");
     setIsLoggedIn(false);
     setUsername(null);
+    supabase.auth.signOut();
   }, []);
+
+  useEffect(() => {
+    const syncSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        login(
+          session.access_token,
+          session.user?.user_metadata?.full_name ??
+            session.user?.email ??
+            undefined
+        );
+      } else {
+        const token = api.getToken();
+        const storedUsername = typeof window !== "undefined" ? localStorage.getItem("username") : null;
+        setIsLoggedIn(!!token);
+        setUsername(storedUsername);
+      }
+    };
+
+    syncSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.access_token) {
+        login(
+          session.access_token,
+          session.user?.user_metadata?.full_name ??
+            session.user?.email ??
+            undefined
+        );
+      } else if (event === "SIGNED_OUT") {
+        logout();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [login, logout]);
 
   return (
     <AuthContext.Provider value={{ isLoggedIn, username, login, logout }}>
