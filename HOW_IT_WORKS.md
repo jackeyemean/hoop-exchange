@@ -2,6 +2,8 @@
 
 Hoop Exchange is a fan-built simulation stock exchange where every basketball player in the current season is a tradeable stock. There is no real money involved — this is purely a game for fans who want to engage with the sport through a financial lens.
 
+**Source of truth:** The values in this document match `engine/backfill.py` and `engine/tier_bootstrap_simulation.py`. Float shares, blending weights, and formula constants are defined there.
+
 ---
 
 ## The Big Picture
@@ -18,19 +20,19 @@ Every player is a stock. You buy and sell shares at the current **share price**.
 | **Float Shares** | The total number of shares that exist for that player. **Fixed for the entire season** — determined by their tier (see below). Does not change mid-season. |
 | **Market Cap** | Share price × float shares. The "total value" of the player stock. This is what we rank by. |
 
-**Example:** Player A has 10M shares at $50 → market cap = $500M. Player B has 2.56M shares at $120 → market cap = $307M. Player A ranks higher despite a lower share price because they have more shares, this is to reward players with a reputation that have done well before.
+**Example:** Player A has 12M shares at $50 → market cap = $600M. Player B has 3M shares at $120 → market cap = $360M. Player A ranks higher despite a lower share price because they have more shares, this is to reward players with a reputation that have done well before.
 
 ---
 
 ## What Drives Share Price? (In Order of Impact)
 
 1. **Raw performance score** — The single biggest driver. Stats (points, assists, steals, etc.) are combined into one number per game (ESPN fantasy–aligned). Elite performers typically score 45–55 per game; bench players 10–25. This flows through a power curve to set the base price.
-2. **Power-law scaling** — A score of 80 is worth far more than 2× a score of 40. The exponent (1.5) creates a steep curve: small stat improvements at the top move the price a lot.
-3. **Recent performance** — The last 10 games are weighted 25% vs. 75% season average. Hot/cold streaks move the needle.
+2. **Power-law scaling** — A score of 80 is worth far more than 2× a score of 40. The exponent (2.5) creates a steep curve: small stat improvements at the top move the price a lot.
+3. **Recent performance** — The last 15 games are weighted 20% vs. 80% season average. Hot/cold streaks move the needle.
 4. **Prior-season blend** — For the first 10 games, prior-year performance is blended in. Players who haven't played yet start at 100% prior-year value.
 5. **Age multiplier** — Young high performers get a boost (up to 1.50×); older low performers get a tax (down to 0.70×). Prime (28–32) = 1.00×.
-6. **Team win%** — Linear by league rank: best team 1.10×, worst team 0.95× (capped +10% / −5%).
-7. **Injury/availability** — Consecutive missed games reduce the multiplier (down to 0.70× at 30+ games missed).
+6. **Team win%** — Linear by league rank: best team 1.15×, worst team 0.90× (capped +15% / −10%).
+7. **Injury/availability** — Consecutive missed games reduce the multiplier (down to 0.70× at 35+ games missed).
 
 ---
 
@@ -43,11 +45,11 @@ The raw score is a weighted sum of 13 stat categories, aligned with ESPN fantasy
 | Points (PTS) | +1.0 | Offensive Rebounds (OREB) | +1.0 |
 | Field Goals Made (FGM) | +1.0 | Defensive Rebounds (DREB) | +1.0 |
 | Field Goals Missed (FGA−FGM) | −1.0 | Assists (AST) | +2.0 |
-| Free Throws Made (FTM) | +1.0 | Steals (STL) | +3.0 |
-| Free Throws Missed (FTA−FTM) | −1.0 | Blocks (BLK) | +3.0 |
+| Free Throws Made (FTM) | +1.0 | Steals (STL) | +4.0 |
+| Free Throws Missed (FTA−FTM) | −1.0 | Blocks (BLK) | +4.0 |
 | 3-Pointers Made (3PM) | +1.0 | Turnovers (TOV) | −2.0 |
 
-**Design notes:** Rebounds (OREB + DREB) and scoring (PTS, FGM, FTM, 3PM) with miss penalties reward efficiency. Assists, steals, and blocks are weighted 2–3× to reflect playmaking and defensive impact. Turnovers are penalized −2 to match ESPN fantasy.
+**Design notes:** Rebounds (OREB + DREB) and scoring (PTS, FGM, FTM, 3PM) with miss penalties reward efficiency. Assists, steals, and blocks are weighted 2–4× to reflect playmaking and defensive impact. Turnovers are penalized −2 to match ESPN fantasy.
 
 ---
 
@@ -60,25 +62,25 @@ Walk through one player’s price calculation step by step.
 Typical Wemby line: 22 pts, 8 FGM, 18 FGA, 5 FTM, 7 FTA, 1 3PM, 2 OREB, 9 DREB, 3.5 AST, 1 STL, 3.5 BLK, 3 TOV.
 
 ```
-raw = (22×1) + (8×1) + (10×−1) + (5×1) + (2×−1) + (1×1) + (2×1) + (9×1) + (3.5×2) + (1×3) + (3.5×3) + (3×−2)
-    = 22 + 8 − 10 + 5 − 2 + 1 + 2 + 9 + 7 + 3 + 10.5 − 6
-    = 49.5 per game
+raw = (22×1) + (8×1) + (10×−1) + (5×1) + (2×−1) + (1×1) + (2×1) + (9×1) + (3.5×2) + (1×4) + (3.5×4) + (3×−2)
+    = 22 + 8 − 10 + 5 − 2 + 1 + 2 + 9 + 7 + 4 + 14 − 6
+    = 54 per game
 ```
 
 ### Step 2: Blending (season + recent form)
 
-Assume 30 games played. Season avg raw = 48, last 10 games avg = 52 (hot streak).
+Assume 30 games played. Season avg raw = 52, last 15 games avg = 56 (hot streak).
 
 ```
-blended_raw = 0.75 × 48 + 0.25 × 52 = 36 + 13 = 49.0
+blended_raw = 0.80 × 52 + 0.20 × 56 = 41.6 + 11.2 = 52.8
 ```
 
 ### Step 3: Base price (power curve)
 
 ```
-perf_score = 49.0
-normalized = 49.0 / 100 = 0.49
-base_price = (0.49 ^ 1.5) × $275 ≈ 0.343 × 275 ≈ $94.33
+perf_score = 52.8
+normalized = 52.8 / 100 = 0.528
+base_price = (0.528 ^ 2.5) × $275 ≈ 0.194 × 275 ≈ $53.35
 ```
 
 ### Step 4: Multipliers
@@ -87,27 +89,27 @@ base_price = (0.49 ^ 1.5) × $275 ≈ 0.343 × 275 ≈ $94.33
   - Pure: +0.81% × 7 = 5.7%
   - Perf-scaled: +6.34% × 7 × 1.0 = 44.4%
   - age_mult = 1.0 + 0.057 + 0.444 = 1.50 → **capped at 1.50×**
-- **Team win%:** Spurs at 45% → rank ~25 of 30 → **~0.97×** (linear 0.95–1.10)
+- **Team win%:** Spurs at 45% → rank ~25 of 30 → **~0.97×** (linear 0.90–1.15)
 - **Injury:** 0 missed → **1.00×**
 
 ### Step 5: Final price
 
 ```
-share_price = $94.33 × 1.50 × 0.97 × 1.00 ≈ $137.25
+share_price = $53.35 × 1.50 × 0.97 × 1.00 ≈ $77.62
 ```
 
-If Wemby is Mag 7 (10M float): market_cap = $137.25 × 10,000,000 = **~$1.37B**.
+If Wemby is Mag 7 (12M float): market_cap = $77.62 × 12,000,000 = **~$931M**.
 
 ### Methodology assessment
 
 | Aspect | Assessment |
 |--------|------------|
 | **Raw score** | ESPN-aligned weights give familiar fantasy-like values and reward efficiency (miss penalties) and defense (steals/blocks). |
-| **Blending** | 75/25 season vs last 10 games balances stability with hot/cold streaks. Prior-year blend for early season avoids noisy starts. |
-| **Power curve** | Exponent 1.5 makes small stat gains at the top matter more than at the bottom, matching how fans value stars. |
+| **Blending** | 80/20 season vs last 15 games balances stability with hot/cold streaks. Prior-year blend for early season avoids noisy starts. |
+| **Power curve** | Exponent 2.5 makes small stat gains at the top matter more than at the bottom, matching how fans value stars. |
 | **Age multiplier** | Young elite players reach 1.5×; older low performers drop toward 0.7×. Prime (28–32) is neutral. |
-| **Win%** | Linear 0.95×–1.10× by league rank; capped ±10% / −5% so team context stays modest. |
-| **Injury** | Quadratic ramp down to 0.70× over 30 missed games models increasing uncertainty. |
+| **Win%** | Linear 0.90×–1.15× by league rank; capped +15% / −10% so team context stays modest. |
+| **Injury** | Quadratic ramp down to 0.70× over 35 missed games models increasing uncertainty. |
 
 Overall, the formula prioritizes performance, uses age and team context as modifiers, and keeps injury as a separate discount.
 
@@ -117,16 +119,16 @@ Overall, the formula prioritizes performance, uses age and team context as modif
 
 The raw score is not computed from a single source. It's blended from three signals:
 
-### 1. Season Average (75% weight when playing)
+### 1. Season Average (80% weight when playing)
 
 All games played so far this season, averaged. This is the baseline.
 
-### 2. Recent Form (25% weight)
+### 2. Recent Form (20% weight)
 
-The **last 10 games** only. If a player was injured and only played 6 of those 10, we use those 6. This captures hot and cold streaks.
+The **last 15 games** only. If a player was injured and only played 10 of those 15, we use those 10. This captures hot and cold streaks.
 
 ```
-blended_raw = 0.75 × season_avg_raw + 0.25 × recent_10_raw
+blended_raw = 0.80 × season_avg_raw + 0.20 × recent_15_raw
 ```
 
 A player on a hot streak will have recent_raw > season_avg_raw, so their blended score (and price) rises. A cold streak does the opposite.
@@ -150,11 +152,11 @@ The blended raw score becomes a base price via:
 ```
 perf_score = max(0.5, blended_raw)
 normalized = perf_score / 100
-base_price = (normalized ^ 1.5) × $275
+base_price = (normalized ^ 2.5) × $275
 ```
 
 - **No cap** — Scores above 100 (theoretical) would exceed $275 base price
-- **PRICE_EXPONENT = 1.5** — creates a steep curve
+- **PRICE_EXPONENT = 2.5** — creates a steep curve
 - **$275** — a normalized score of 1.0 (raw = 100) yields $275 base price; typical elite raw 50 → ~$97
 
 **Rough examples:** (Raw scores are typically 15–55 per game; elite players often 45–55.)
@@ -199,8 +201,8 @@ This keeps team context modest: a 25-point spread across the league, so individu
 Consecutive missed games reduce the multiplier:
 
 - **0 missed:** 1.00×
-- **1–29 missed:** Quadratic ramp. Early games have a small impact; it steepens toward 30.
-- **30+ missed:** **Capped at 0.70×** (30% penalty). 50 games missed = same as 30.
+- **1–34 missed:** Quadratic ramp. Early games have a small impact; it steepens toward 35.
+- **35+ missed:** **Capped at 0.70×** (30% penalty). 50 games missed = same as 35.
 
 "Consecutive missed" is inferred from days since last game (≈ 2 days per game in the schedule).
 
@@ -222,11 +224,11 @@ Each player's float shares are **fixed for the season** and determined by their 
 
 | Tier | Float Shares | Assignment |
 |------|--------------|------------|
-| Magnificent 7 | 10,000,000 | Top 7 by prior-year price |
+| Magnificent 7 | 12,000,000 | Top 7 by prior-year price |
 | Blue Chip | 8,000,000 | Ranks 8–40 |
-| Growth | 6,400,000 | Ranks 41–150 |
-| Mid Cap | 5,120,000 | Ranks 151–250 |
-| Penny Stock | 2,560,000 | Everyone else |
+| Growth | 6,000,000 | Ranks 41–150 |
+| Mid Cap | 5,000,000 | Ranks 151–250 |
+| Penny Stock | 3,000,000 | Everyone else |
 
 **Rookies** (first season): Lottery (1–14) → Growth; first round/early second (15–39) → Mid Cap; else → Penny Stock.
 
@@ -239,7 +241,7 @@ Tiers are built from historical performance. The full methodology runs in two ph
 ### Phase 1: Prior Two Seasons (2023–24, 2024–25) — Uniform Shares
 
 - **Float shares:** All players get the same 5M shares (no tier variation).
-- **Full methodology:** Raw performance, blending (season + last 10 + prior-year), power curve, age multiplier, win% multiplier, injury multiplier — all applied.
+- **Full methodology:** Raw performance, blending (season + last 15 + prior-year), power curve, age multiplier, win% multiplier, injury multiplier — all applied.
 - **Purpose:** Build a clean performance ranking. End-of-2024–25 price ranking determines tier assignment for the current season.
 
 ### Phase 2: Current Season (2025–26) — Tier-Based Shares
@@ -266,10 +268,10 @@ To match the market cap of a player in the tier above you, you need this much hi
 
 | Your Tier → Tier Above | Price Premium |
 |------------------------|---------------|
-| Penny Stock → Mid Cap | 2× |
-| Mid Cap → Growth | 1.25× |
-| Growth → Blue Chip | 1.25× |
-| Blue Chip → Mag 7 | 1.25× |
+| Penny Stock → Mid Cap | 1.67× |
+| Mid Cap → Growth | 1.2× |
+| Growth → Blue Chip | 1.33× |
+| Blue Chip → Mag 7 | 1.5× |
 
 ---
 
