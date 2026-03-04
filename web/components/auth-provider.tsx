@@ -28,21 +28,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
 
-  const login = useCallback(async (token: string, u?: string) => {
+  const login = useCallback((token: string, u?: string) => {
     api.setToken(token);
     if (u) {
       localStorage.setItem("username", u);
       setUsername(u);
     } else {
-      try {
-        const me = await api.getMe();
+      setUsername(localStorage.getItem("username"));
+      void api.getMe().then((me) => {
         if (me) {
           localStorage.setItem("username", me.username);
           setUsername(me.username);
         }
-      } catch {
-        setUsername(localStorage.getItem("username"));
-      }
+      }).catch(() => {});
     }
     setIsLoggedIn(true);
   }, []);
