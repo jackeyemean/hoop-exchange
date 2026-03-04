@@ -10,6 +10,15 @@ import Link from "next/link";
 
 type PriceRange = "all" | "season" | "month" | "week" | "day";
 
+const INDEX_NAME_TO_TICKER: Record<string, string> = {
+  "S&P 500": "INX",
+  "S&P 100": "OEX",
+  "Dow Jones Industrial Average": "DJIA",
+  "Magnificent 7": "MAG7",
+  "Blue Chips": "BLUE",
+  "Renaissance IPO Index": "IPO",
+};
+
 const TEAM_NAME_TO_ABBREV: Record<string, string> = {
   "Atlanta Hawks": "ATL", "Boston Celtics": "BOS", "Brooklyn Nets": "BKN",
   "Charlotte Hornets": "CHA", "Chicago Bulls": "CHI", "Cleveland Cavaliers": "CLE",
@@ -23,7 +32,10 @@ const TEAM_NAME_TO_ABBREV: Record<string, string> = {
   "Toronto Raptors": "TOR", "Utah Jazz": "UTA", "Washington Wizards": "WAS",
 };
 
-function getIndexTicker(idx: { indexType?: string; index_type?: string; name?: string; teamAbbreviation?: string; team_abbreviation?: string }): string {
+function getIndexTicker(idx: { ticker?: string; indexType?: string; index_type?: string; name?: string; teamAbbreviation?: string; team_abbreviation?: string }): string {
+  if (idx.ticker && idx.ticker.trim()) return idx.ticker;
+  const name = idx.name || "";
+  if (INDEX_NAME_TO_TICKER[name]) return INDEX_NAME_TO_TICKER[name];
   const type = idx.indexType || idx.index_type || "";
   if (type === "team") {
     const abbrev = idx.teamAbbreviation ?? idx.team_abbreviation;
@@ -37,7 +49,6 @@ function getIndexTicker(idx: { indexType?: string; index_type?: string; name?: s
     if (name.includes("wing")) return "WINGS";
     if (name.includes("big")) return "BIGS";
   }
-  if (type === "league") return "NBA";
   return "—";
 }
 

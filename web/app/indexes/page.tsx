@@ -17,21 +17,32 @@ const TEAM_NAME_TO_ABBREV: Record<string, string> = {
   "Toronto Raptors": "TOR", "Utah Jazz": "UTA", "Washington Wizards": "WAS",
 };
 
-function getIndexTicker(idx: { indexType?: string; index_type?: string; name?: string; teamAbbreviation?: string; team_abbreviation?: string }): string {
+const INDEX_NAME_TO_TICKER: Record<string, string> = {
+  "S&P 500": "INX",
+  "S&P 100": "OEX",
+  "Dow Jones Industrial Average": "DJIA",
+  "Magnificent 7": "MAG7",
+  "Blue Chips": "BLUE",
+  "Renaissance IPO Index": "IPO",
+};
+
+function getIndexTicker(idx: { ticker?: string; indexType?: string; index_type?: string; name?: string; teamAbbreviation?: string; team_abbreviation?: string }): string {
+  if (idx.ticker && idx.ticker.trim()) return idx.ticker;
+  const name = idx.name || "";
+  if (INDEX_NAME_TO_TICKER[name]) return INDEX_NAME_TO_TICKER[name];
   const type = idx.indexType || idx.index_type || "";
   if (type === "team") {
     const abbrev = idx.teamAbbreviation ?? idx.team_abbreviation;
     if (abbrev) return abbrev;
-    const display = displayName(idx.name || "");
+    const display = displayName(name);
     return TEAM_NAME_TO_ABBREV[display] || "—";
   }
   if (type === "position") {
-    const name = (idx.name || "").toLowerCase();
-    if (name.includes("guard")) return "GUARD";
-    if (name.includes("wing")) return "WINGS";
-    if (name.includes("big")) return "BIGS";
+    const nameLower = name.toLowerCase();
+    if (nameLower.includes("guard")) return "GUARD";
+    if (nameLower.includes("wing")) return "WINGS";
+    if (nameLower.includes("big")) return "BIGS";
   }
-  if (type === "league") return "NBA";
   return "—";
 }
 
@@ -46,13 +57,21 @@ export default function IndexesPage() {
   });
 
   const indexes = data?.indexes || [];
-  const typeOrder = ["league", "team", "position"];
+  // Row 1: S&P 500, S&P 100, Dow Jones | Row 2: IPO, Mag 7, Blue Chips
+  const marketOrder = ["sp500", "sp100", "djia", "ipo", "tier_mag7", "tier_bluechip"];
+  const typeOrder = ["market", "team", "position"];
+  const getType = (i: any) => i.indexType || i.index_type || "";
   const grouped = {
-    league: indexes.filter((i: any) => (i.indexType || i.index_type) === "league"),
-    team: indexes.filter((i: any) => (i.indexType || i.index_type) === "team"),
-    position: indexes.filter((i: any) => (i.indexType || i.index_type) === "position"),
+    market: marketOrder
+      .map((t) => indexes.find((i: any) => getType(i) === t))
+      .filter(Boolean),
+    team: indexes.filter((i: any) => getType(i) === "team"),
+    position: indexes.filter((i: any) => getType(i) === "position"),
   };
-  const hasGrouped = Object.values(grouped).some((arr) => arr.length > 0);
+  const hasGrouped =
+    grouped.market.length > 0 ||
+    grouped.team.length > 0 ||
+    grouped.position.length > 0;
 
   return (
     <div>
@@ -86,10 +105,15 @@ export default function IndexesPage() {
         <>
           {typeOrder.map((type) => {
             const items = grouped[type as keyof typeof grouped];
-            if (items.length === 0) return null;
+            if (!items || items.length === 0) return null;
+            const sectionTitles: Record<string, string> = {
+              market: "Market Indexes",
+              team: "Team",
+              position: "Position",
+            };
             return (
               <div key={type} className="mb-8">
-                <h2 className="mb-3 text-lg font-semibold capitalize">{type}</h2>
+                <h2 className="mb-3 text-lg font-semibold">{sectionTitles[type] || type}</h2>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {items.map((idx: any) => (
                     <Link

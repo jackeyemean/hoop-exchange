@@ -81,8 +81,9 @@ export interface Trade {
 export interface StockIndex {
   id: number;
   name: string;
-  indexType: "league" | "team" | "position" | "momentum";
+  indexType: "league" | "team" | "position" | "momentum" | "sp500" | "sp100" | "djia" | "tier_mag7" | "tier_bluechip" | "tier_growth" | "ipo";
   description: string;
+  ticker?: string;
   teamId: number | null;
 }
 

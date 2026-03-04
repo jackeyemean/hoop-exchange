@@ -196,6 +196,13 @@ const (
 	IndexTeam     IndexType = "team"
 	IndexPosition IndexType = "position"
 	IndexMomentum IndexType = "momentum"
+	IndexSP500    IndexType = "sp500"
+	IndexSP100    IndexType = "sp100"
+	IndexDJIA     IndexType = "djia"
+	IndexTierMag7 IndexType = "tier_mag7"
+	IndexTierBlue IndexType = "tier_bluechip"
+	IndexTierGrow IndexType = "tier_growth"
+	IndexIPO      IndexType = "ipo"
 )
 
 type Index struct {
@@ -203,6 +210,7 @@ type Index struct {
 	Name               string    `json:"name"`
 	IndexType          IndexType `json:"indexType"`
 	Description        string    `json:"description,omitempty"`
+	Ticker             *string   `json:"ticker,omitempty"`
 	TeamID             *int      `json:"teamId,omitempty"`
 	TeamAbbreviation   *string   `json:"teamAbbreviation,omitempty"`
 	CreatedAt          time.Time `json:"createdAt"`

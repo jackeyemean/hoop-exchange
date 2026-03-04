@@ -16,7 +16,15 @@ POSITION_GROUPS = {
 def setup_default_indexes(conn, season_id: int):
     log.info("Setting up default indexes for season %d", season_id)
 
-    _upsert_index(conn, "NBA League Index", "league", "Cap-weighted index of all active players")
+    # Market-cap-ranked indexes (cap-weighted, top N by market cap)
+    _upsert_index(conn, "S&P 500", "sp500", "Cap-weighted index of top 500 players by market cap", ticker="INX")
+    _upsert_index(conn, "S&P 100", "sp100", "Cap-weighted index of top 100 players by market cap", ticker="OEX")
+    _upsert_index(conn, "Dow Jones Industrial Average", "djia", "Cap-weighted index of top 30 players by market cap", ticker="DJIA")
+
+    # Tier-based indexes (all players in tier, cap-weighted)
+    _upsert_index(conn, "Magnificent 7", "tier_mag7", "Cap-weighted index of all Magnificent 7 tier players", ticker="MAG7")
+    _upsert_index(conn, "Blue Chips", "tier_bluechip", "Cap-weighted index of all Blue Chip tier players", ticker="BLUE")
+    _upsert_index(conn, "Renaissance IPO Index", "ipo", "Cap-weighted index of all rookies in the current season", ticker="IPO")
 
     with conn.cursor() as cur:
         cur.execute("SELECT id, name FROM teams")
@@ -47,18 +55,20 @@ def setup_default_indexes(conn, season_id: int):
     log.info("Default indexes created")
 
 
-def _upsert_index(conn, name: str, index_type: str, description: str, team_id: int | None = None):
+def _upsert_index(conn, name: str, index_type: str, description: str, team_id: int | None = None, ticker: str | None = None):
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO indexes (name, index_type, description, team_id)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO indexes (name, index_type, description, team_id, ticker)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (name) DO UPDATE SET
+                index_type = EXCLUDED.index_type,
                 description = EXCLUDED.description,
-                team_id = COALESCE(EXCLUDED.team_id, indexes.team_id)
+                team_id = COALESCE(EXCLUDED.team_id, indexes.team_id),
+                ticker = COALESCE(EXCLUDED.ticker, indexes.ticker)
             RETURNING id
             """,
-            (name, index_type, description, team_id),
+            (name, index_type, description, team_id, ticker),
         )
         return cur.fetchone()[0]
 
@@ -71,6 +81,26 @@ def _cap_weights(raw_weights: dict[int, float]) -> dict[int, float]:
     return {k: v / total for k, v in raw_weights.items()}
 
 
+def _get_rookie_external_ids(conn, season_id: int) -> set[str]:
+    """Fetch draft class for the season's draft year; returns set of external_ids."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT label FROM seasons WHERE id = %s", (season_id,))
+        row = cur.fetchone()
+    if not row:
+        return set()
+    draft_year = int(str(row[0]).split("-")[0])
+    try:
+        from nba_api.stats.endpoints import DraftHistory
+        import time
+        time.sleep(0.5)  # Rate limit
+        resp = DraftHistory(season_year_nullable=draft_year)
+        df = resp.get_data_frames()[0]
+        return {str(r["PERSON_ID"]) for _, r in df.iterrows()}
+    except Exception as e:
+        log.warning("Failed to fetch draft history for IPO index: %s", e)
+        return set()
+
+
 def rebalance_indexes(conn, season_id: int, trade_date: date, publish_redis: bool = True):
     log.info("Rebalancing indexes for season %d on %s", season_id, trade_date)
 
@@ -78,7 +108,7 @@ def rebalance_indexes(conn, season_id: int, trade_date: date, publish_redis: boo
         cur.execute(
             """
             SELECT ph.player_season_id, ph.price, ph.market_cap, ph.change_pct,
-                   ps.team_id, p.position
+                   ps.team_id, p.position, ps.tier::text, p.external_id
             FROM price_history ph
             JOIN player_seasons ps ON ph.player_season_id = ps.id
             JOIN players p ON ps.player_id = p.id
@@ -98,8 +128,11 @@ def rebalance_indexes(conn, season_id: int, trade_date: date, publish_redis: boo
         all_prices[row[0]] = {
             "price": float(row[1]), "market_cap": float(row[2]),
             "change_pct": float(row[3]) if row[3] else 0.0,
-            "team_id": row[4], "position": row[5] or "",
+            "team_id": row[4], "position": row[5] or "", "tier": row[6] or "",
+            "external_id": str(row[7]) if row[7] else "",
         }
+
+    rookie_external_ids = _get_rookie_external_ids(conn, season_id)
 
     with conn.cursor() as cur:
         cur.execute("SELECT id, name, index_type, team_id FROM indexes")
@@ -120,12 +153,23 @@ def rebalance_indexes(conn, season_id: int, trade_date: date, publish_redis: boo
     index_results = []
 
     for idx_id, idx_name, idx_type, idx_team_id in indexes:
-        constituents = _select_constituents(all_prices, idx_type, idx_team_id, idx_name)
+        constituents = _select_constituents(all_prices, idx_type, idx_team_id, idx_name, rookie_external_ids)
         if not constituents:
             continue
 
         raw_weights = {ps_id: all_prices[ps_id]["market_cap"] for ps_id in constituents}
         capped = _cap_weights(raw_weights)
+
+        # Remove constituents no longer in the index (e.g. dropped from top 500)
+        constituent_ids = list(capped.keys())
+        with conn.cursor() as cur:
+            if constituent_ids:
+                cur.execute(
+                    "DELETE FROM index_constituents WHERE index_id = %s AND player_season_id != ALL(%s)",
+                    (idx_id, constituent_ids),
+                )
+            else:
+                cur.execute("DELETE FROM index_constituents WHERE index_id = %s", (idx_id,))
 
         for ps_id, weight in capped.items():
             _upsert_constituent(conn, idx_id, ps_id, weight)
@@ -175,10 +219,34 @@ def rebalance_indexes(conn, season_id: int, trade_date: date, publish_redis: boo
             log.debug("Redis publish skipped (optional for real-time): %s", e)
 
 
+# Cap limits for market-cap-ranked indexes
+SP500_CAP = 500
+SP100_CAP = 100
+DJIA_CAP = 30
+
+
 def _select_constituents(all_prices: dict, idx_type: str, team_id: int | None,
-                         index_name: str = "") -> list[int]:
-    if idx_type == "league":
-        return list(all_prices.keys())
+                         index_name: str = "", rookie_external_ids: set[str] | None = None) -> list[int]:
+    # Market-cap-ranked: top N by market cap (cap-weighted)
+    if idx_type == "sp500":
+        sorted_ids = sorted(all_prices.keys(), key=lambda k: all_prices[k]["market_cap"], reverse=True)
+        return sorted_ids[:SP500_CAP]
+    if idx_type == "sp100":
+        sorted_ids = sorted(all_prices.keys(), key=lambda k: all_prices[k]["market_cap"], reverse=True)
+        return sorted_ids[:SP100_CAP]
+    if idx_type == "djia":
+        sorted_ids = sorted(all_prices.keys(), key=lambda k: all_prices[k]["market_cap"], reverse=True)
+        return sorted_ids[:DJIA_CAP]
+
+    # Tier-based: all players in tier (cap-weighted)
+    if idx_type == "tier_mag7":
+        return [ps_id for ps_id, info in all_prices.items() if info.get("tier") == "magnificent_7"]
+    if idx_type == "tier_bluechip":
+        return [ps_id for ps_id, info in all_prices.items() if info.get("tier") == "blue_chip"]
+    # IPO index: all rookies (drafted in current season's draft year)
+    if idx_type == "ipo":
+        rookies = rookie_external_ids or set()
+        return [ps_id for ps_id, info in all_prices.items() if info.get("external_id", "") in rookies]
 
     if idx_type == "team" and team_id is not None:
         return [ps_id for ps_id, info in all_prices.items() if info["team_id"] == team_id]

@@ -1,8 +1,30 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useTheme } from "./theme-provider";
 import { useAuth } from "./auth-provider";
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isActive =
+    href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/");
+  return (
+    <Link
+      href={href}
+      className={`relative py-3 transition-colors ${
+        isActive
+          ? "text-neutral-900 dark:text-white font-semibold"
+          : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+      }`}
+    >
+      {children}
+      {isActive && (
+        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 dark:bg-white rounded-full" />
+      )}
+    </Link>
+  );
+}
 
 export function Navbar() {
   const { theme, toggle } = useTheme();
@@ -18,19 +40,11 @@ export function Navbar() {
           Hoop Exchange
         </Link>
 
-        <div className="flex items-center gap-6 text-sm font-medium text-neutral-600 dark:text-neutral-400">
-          <Link href="/" className="hover:text-neutral-900 dark:hover:text-white transition-colors">
-            Discover
-          </Link>
-          <Link href="/indexes" className="hover:text-neutral-900 dark:hover:text-white transition-colors">
-            Indexes
-          </Link>
-          <Link href="/portfolio" className="hover:text-neutral-900 dark:hover:text-white transition-colors">
-            Portfolio
-          </Link>
-          <Link href="/leaderboard" className="hover:text-neutral-900 dark:hover:text-white transition-colors">
-            Leaderboard
-          </Link>
+        <div className="flex items-center gap-6 text-sm font-medium">
+          <NavLink href="/">Discover</NavLink>
+          <NavLink href="/indexes">Indexes</NavLink>
+          <NavLink href="/portfolio">Portfolio</NavLink>
+          <NavLink href="/leaderboard">Leaderboard</NavLink>
           {isLoggedIn ? (
             <div className="flex items-center gap-3">
               <span className="text-neutral-500">{username || "User"}</span>

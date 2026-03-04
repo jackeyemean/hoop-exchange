@@ -62,6 +62,9 @@ docker compose up -d postgres redis
 ```bash
 psql $DATABASE_URL -f migrations/001_initial_schema.up.sql
 psql $DATABASE_URL -f migrations/002_game_stats_wl.up.sql
+psql $DATABASE_URL -f migrations/003_index_history_precision.up.sql
+psql $DATABASE_URL -f migrations/004_index_ticker_and_types.up.sql
+psql $DATABASE_URL -f migrations/005_renaissance_ipo_index.up.sql
 ```
 
 ### 3. Set up environment

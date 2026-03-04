@@ -19,13 +19,13 @@ func NewIndexRepository(pool *pgxpool.Pool) *IndexRepository {
 func (r *IndexRepository) GetByID(ctx context.Context, id int) (*model.Index, error) {
 	idx := &model.Index{}
 	err := r.Pool.QueryRow(ctx,
-		`SELECT i.id, i.name, i.index_type, i.description, i.team_id, i.created_at,
+		`SELECT i.id, i.name, i.index_type, i.description, i.ticker, i.team_id, i.created_at,
 		        t.abbreviation
 		 FROM indexes i
 		 LEFT JOIN teams t ON t.id = i.team_id
 		 WHERE i.id = $1`,
 		id,
-	).Scan(&idx.ID, &idx.Name, &idx.IndexType, &idx.Description, &idx.TeamID, &idx.CreatedAt, &idx.TeamAbbreviation)
+	).Scan(&idx.ID, &idx.Name, &idx.IndexType, &idx.Description, &idx.Ticker, &idx.TeamID, &idx.CreatedAt, &idx.TeamAbbreviation)
 	if err != nil {
 		return nil, fmt.Errorf("get index: %w", err)
 	}
@@ -34,7 +34,7 @@ func (r *IndexRepository) GetByID(ctx context.Context, id int) (*model.Index, er
 
 func (r *IndexRepository) ListAll(ctx context.Context) ([]model.Index, error) {
 	rows, err := r.Pool.Query(ctx,
-		`SELECT i.id, i.name, i.index_type, i.description, i.team_id, i.created_at,
+		`SELECT i.id, i.name, i.index_type, i.description, i.ticker, i.team_id, i.created_at,
 		        t.abbreviation
 		 FROM indexes i
 		 LEFT JOIN teams t ON t.id = i.team_id
@@ -48,7 +48,7 @@ func (r *IndexRepository) ListAll(ctx context.Context) ([]model.Index, error) {
 	var results []model.Index
 	for rows.Next() {
 		var idx model.Index
-		err := rows.Scan(&idx.ID, &idx.Name, &idx.IndexType, &idx.Description, &idx.TeamID, &idx.CreatedAt, &idx.TeamAbbreviation)
+		err := rows.Scan(&idx.ID, &idx.Name, &idx.IndexType, &idx.Description, &idx.Ticker, &idx.TeamID, &idx.CreatedAt, &idx.TeamAbbreviation)
 		if err != nil {
 			return nil, fmt.Errorf("scan index: %w", err)
 		}
