@@ -56,19 +56,24 @@ func (s *AuthService) Register(ctx context.Context, email, username, password st
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, error) {
+	token, _, err := s.LoginWithUsername(ctx, email, password)
+	return token, err
+}
+
+func (s *AuthService) LoginWithUsername(ctx context.Context, email, password string) (string, string, error) {
 	user, err := s.Users.GetByEmail(ctx, email)
 	if err != nil {
-		return "", errors.New("invalid email or password")
+		return "", "", errors.New("invalid email or password")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return "", errors.New("invalid email or password")
+		return "", "", errors.New("invalid email or password")
 	}
 
 	token, err := middleware.GenerateToken(user.ID, s.JWTSecret)
 	if err != nil {
-		return "", fmt.Errorf("generate token: %w", err)
+		return "", "", fmt.Errorf("generate token: %w", err)
 	}
 
-	return token, nil
+	return token, user.Username, nil
 }

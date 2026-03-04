@@ -55,3 +55,47 @@ func (r *TradeRepository) ListByUserID(ctx context.Context, userID uuid.UUID, li
 	}
 	return results, rows.Err()
 }
+
+type TradeWithPlayer struct {
+	model.Trade
+	Player *struct {
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
+	} `json:"player"`
+}
+
+func (r *TradeRepository) ListByUserIDWithPlayer(ctx context.Context, userID uuid.UUID, limit int) ([]TradeWithPlayer, error) {
+	rows, err := r.Pool.Query(ctx,
+		`SELECT t.id, t.order_id, t.user_id, t.player_season_id, t.side, t.quantity, t.price, t.total, t.executed_at,
+		        p.first_name, p.last_name
+		 FROM trades t
+		 JOIN player_seasons ps ON ps.id = t.player_season_id
+		 JOIN players p ON p.id = ps.player_id
+		 WHERE t.user_id = $1
+		 ORDER BY t.executed_at DESC
+		 LIMIT $2`,
+		userID, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list trades with player: %w", err)
+	}
+	defer rows.Close()
+
+	var results []TradeWithPlayer
+	for rows.Next() {
+		var twp TradeWithPlayer
+		var firstName, lastName string
+		err := rows.Scan(&twp.ID, &twp.OrderID, &twp.UserID, &twp.PlayerSeasonID,
+			&twp.Side, &twp.Quantity, &twp.Price, &twp.Total, &twp.ExecutedAt,
+			&firstName, &lastName)
+		if err != nil {
+			return nil, fmt.Errorf("scan trade: %w", err)
+		}
+		twp.Player = &struct {
+			FirstName string `json:"firstName"`
+			LastName  string `json:"lastName"`
+		}{FirstName: firstName, LastName: lastName}
+		results = append(results, twp)
+	}
+	return results, rows.Err()
+}

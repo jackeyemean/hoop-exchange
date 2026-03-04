@@ -8,12 +8,13 @@ import (
 	"github.com/jacky/nba-exchange/backend/internal/model"
 )
 
-// PriceHistoryRange: all (from 2023-24), season (current), month, week
+// PriceHistoryRange: all (from 2023-24), season (current), month, week, day
 const (
 	RangeAll    = "all"
 	RangeSeason = "season"
 	RangeMonth  = "month"
 	RangeWeek   = "week"
+	RangeDay    = "day"
 )
 
 type PlayerWithPrice struct {
@@ -74,7 +75,7 @@ func (r *PlayerRepository) GetPlayerSeasonByID(ctx context.Context, id int) (*mo
 	ps := &model.PlayerSeason{Player: &model.Player{}, Team: &model.Team{}}
 	err := r.Pool.QueryRow(ctx,
 		`SELECT ps.id, ps.player_id, ps.season_id, ps.team_id, ps.tier, ps.float_shares, ps.status, ps.created_at,
-		        p.id, p.external_id, COALESCE(p.ticker, ''), p.first_name, p.last_name, p.birthdate, p.position, p.height, p.weight,
+		        p.id, p.external_id, p.first_name, p.last_name, p.birthdate, p.position, p.height, p.weight,
 		        t.id, t.external_id, t.name, t.abbreviation, t.city
 		 FROM player_seasons ps
 		 JOIN players p ON p.id = ps.player_id
@@ -223,6 +224,26 @@ func (r *PlayerRepository) GetPriceHistoryForPlayer(ctx context.Context, playerI
 	var args []interface{}
 
 	switch rangeFilter {
+	case RangeDay:
+		// Same 2 points the home page "change" uses: latest price + previous distinct price
+		// (prev is most recent row where price differs from latest, so the line shows the day-over-day change)
+		query = `WITH latest AS (
+		             SELECT price, trade_date FROM price_history
+		             WHERE player_season_id = $1 ORDER BY trade_date DESC LIMIT 1
+		         ),
+		         prev AS (
+		             SELECT ph.trade_date FROM price_history ph, latest l
+		             WHERE ph.player_season_id = $1 AND ph.price IS DISTINCT FROM l.price
+		             ORDER BY ph.trade_date DESC LIMIT 1
+		         )
+		         SELECT ph.id, ph.player_season_id, ph.trade_date, ph.perf_score, ph.age_mult, ph.win_pct_mult,
+		                ph.salary_eff_mult, ph.raw_score, ph.price, ph.market_cap, ph.prev_price, ph.change_pct, ph.created_at
+		         FROM price_history ph
+		         WHERE ph.player_season_id = $1
+		         AND (ph.trade_date = (SELECT trade_date FROM latest)
+		              OR ph.trade_date = (SELECT trade_date FROM prev))
+		         ORDER BY ph.trade_date ASC`
+		args = []interface{}{playerSeasonID}
 	case RangeSeason:
 		query = `SELECT ph.id, ph.player_season_id, ph.trade_date, ph.perf_score, ph.age_mult, ph.win_pct_mult,
 		         ph.salary_eff_mult, ph.raw_score, ph.price, ph.market_cap, ph.prev_price, ph.change_pct, ph.created_at

@@ -124,8 +124,84 @@ npm run dev
 
 ```bash
 python main.py sync-all --season 2025-26     # Full data sync
+python main.py sync-standings --season 2025-26  # Standings only (for daily schedule)
 python main.py ingest --season 2025-26 --date 2025-12-01  # Single date
 python main.py price --season 2025-26         # Run pricing
 python main.py rebalance --season 2025-26     # Rebalance indexes
 python main.py schedule --season 2025-26      # Daily scheduler (8am ET)
+```
+
+## Market Automation
+
+The engine runs a daily job at **8:00 AM ET** that:
+
+1. Ingests game stats (yesterday, or Fri–Sun if Monday)
+2. Syncs standings
+3. Runs pricing (updates all player prices)
+4. Rebalances indexes
+
+### Option 1: Run as a long-lived process
+
+```bash
+cd engine
+python main.py schedule --season 2025-26
+```
+
+Keeps running and triggers the job daily. Use `nohup`, `screen`, or `tmux` for background execution.
+
+### Option 2: Cron (Linux/macOS)
+
+Use a wrapper script that replicates the schedule logic (Monday = ingest Fri–Sun; other weekdays = ingest yesterday). Example `run_daily.sh`:
+
+```bash
+#!/bin/bash
+cd /path/to/nba-exchange/engine
+SEASON="2025-26"
+TODAY=$(date +%Y-%m-%d)
+if [ "$(date +%u)" = "1" ]; then
+  for d in 3 2 1; do
+    D=$(date -d "$TODAY - ${d} days" +%Y-%m-%d)
+    python main.py ingest --season "$SEASON" --date "$D" || true
+  done
+else
+  YESTERDAY=$(date -d "$TODAY - 1 day" +%Y-%m-%d)
+  python main.py ingest --season "$SEASON" --date "$YESTERDAY" || true
+fi
+python main.py sync-standings --season "$SEASON"
+python main.py price --season "$SEASON"
+python main.py rebalance --season "$SEASON"
+```
+
+Then add to crontab (8:00 AM ET weekdays): `0 8 * * 1-5 /path/to/run_daily.sh`
+
+**Simpler:** Run `python main.py schedule --season 2025-26` as a daemon (Option 1) instead of cron.
+
+### Option 3: systemd (Linux)
+
+Create `/etc/systemd/system/nba-exchange-engine.service`:
+
+```ini
+[Unit]
+Description=NBA Exchange Engine Scheduler
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=youruser
+WorkingDirectory=/path/to/nba-exchange/engine
+ExecStart=/usr/bin/python3 main.py schedule --season 2025-26
+Restart=always
+RestartSec=60
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable nba-exchange-engine
+sudo systemctl start nba-exchange-engine
 ```

@@ -38,7 +38,13 @@ func (h *IndexHandler) GetIndex(c *gin.Context) {
 		limit = 30
 	}
 
-	constituents, err := h.Indexes.GetConstituents(c.Request.Context(), id)
+	index, err := h.Indexes.GetByID(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "index not found"})
+		return
+	}
+
+	constituents, err := h.Indexes.GetConstituentsWithDetails(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch constituents"})
 		return
@@ -51,6 +57,7 @@ func (h *IndexHandler) GetIndex(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
+		"index":        index,
 		"constituents": constituents,
 		"history":      history,
 	})

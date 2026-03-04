@@ -68,6 +68,18 @@ def rebalance(season: str):
         conn.close()
 
 
+@cli.command("sync-standings")
+@click.option("--season", required=True, help="Season label, e.g. 2025-26")
+def sync_standings_cmd(season: str):
+    """Sync standings only (used by daily schedule)."""
+    conn = get_db_connection()
+    try:
+        sync_standings(conn, season)
+        log.info("Standings sync complete")
+    finally:
+        conn.close()
+
+
 @cli.command("sync-all")
 @click.option("--season", required=True, help="Season label, e.g. 2025-26")
 def sync_all(season: str):

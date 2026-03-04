@@ -36,5 +36,16 @@ func (h *LeaderboardHandler) GetLeaderboard(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"leaderboard": snapshots})
+	// If no snapshots for requested date, use live computation (e.g. for today)
+	today := time.Now().Truncate(24 * time.Hour)
+	reqDate := date.Truncate(24 * time.Hour)
+	if len(snapshots) == 0 && reqDate.Equal(today) {
+		snapshots, err = h.Leaderboard.GetLive(c.Request.Context(), limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch leaderboard"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"entries": snapshots})
 }

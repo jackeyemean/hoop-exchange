@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/components/auth-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { Navbar } from "@/components/navbar";
 
@@ -20,18 +21,27 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem('theme');var m=t||'dark';document.documentElement.classList.toggle('dark',m==='dark');})();`,
+          }}
+        />
+      </head>
       <body
         className={`${inter.className} bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 antialiased`}
       >
         <ThemeProvider>
-          <QueryProvider>
-            <Navbar />
-            <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
-            <footer className="border-t border-neutral-200 dark:border-neutral-800 py-6 text-center text-xs text-neutral-500">
-              Fan simulation. Not affiliated with any professional league. No
-              real monetary value.
-            </footer>
-          </QueryProvider>
+          <AuthProvider>
+            <QueryProvider>
+              <Navbar />
+              <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+              <footer className="border-t border-neutral-200 dark:border-neutral-800 py-6 text-center text-xs text-neutral-500">
+                Fan simulation. Not affiliated with any professional league. No
+                real monetary value.
+              </footer>
+            </QueryProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -52,7 +52,7 @@ class ApiClient {
   }
 
   login(email: string, password: string) {
-    return this.request<{ token: string }>("/api/auth/login", {
+    return this.request<{ token: string; username: string }>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
@@ -63,7 +63,7 @@ class ApiClient {
     return this.request<{ players: any[] }>("/api/players");
   }
 
-  getPlayer(id: number, range?: "all" | "season" | "month" | "week") {
+  getPlayer(id: number, range?: "all" | "season" | "month" | "week" | "day") {
     const params = range ? `?range=${range}` : "";
     return this.request<{ player: any; prices: any[] }>(`/api/players/${id}${params}`);
   }

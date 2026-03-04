@@ -1,1 +1,32 @@
 @import "tailwindcss";
+
+/* Tailwind v4: use class-based dark mode instead of prefers-color-scheme */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Minimal scrollbar for horizontal movers section - matches theme */
+.movers-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(163 163 163) transparent;
+}
+.dark .movers-scroll {
+  scrollbar-color: rgb(82 82 82) transparent;
+}
+.movers-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.movers-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.movers-scroll::-webkit-scrollbar-thumb {
+  background: rgb(163 163 163);
+  border-radius: 3px;
+}
+.movers-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(115 115 115);
+}
+.dark .movers-scroll::-webkit-scrollbar-thumb {
+  background: rgb(82 82 82);
+}
+.dark .movers-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(115 115 115);
+}

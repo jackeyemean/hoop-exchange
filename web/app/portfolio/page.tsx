@@ -1,24 +1,63 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { formatCurrency, formatPct, pctColor } from "@/lib/utils";
-import Link from "next/link";
+import { useAuth } from "@/components/auth-provider";
 
 export default function PortfolioPage() {
-  const { data, isLoading } = useQuery({
+  const { isLoggedIn } = useAuth();
+  const { data, isLoading, error } = useQuery({
     queryKey: ["portfolio"],
     queryFn: () => api.getPortfolio(),
+    enabled: isLoggedIn,
   });
 
   const { data: tradesData } = useQuery({
     queryKey: ["trades"],
     queryFn: () => api.getTrades(),
+    enabled: isLoggedIn,
   });
+
+  if (!isLoggedIn) {
+    return (
+      <div>
+        <h1 className="mb-6 text-2xl font-bold">Portfolio</h1>
+        <div className="rounded-lg border border-neutral-200 py-16 text-center dark:border-neutral-800">
+          <p className="mb-4 text-neutral-500">
+            Log in to view your portfolio and trading history.
+          </p>
+          <div className="flex justify-center gap-3">
+            <Link
+              href="/login"
+              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/register"
+              className="rounded-md border border-neutral-200 px-4 py-2 text-sm font-semibold hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+            >
+              Sign up
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
       <div className="py-20 text-center text-neutral-500">Loading...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="py-20 text-center text-red-500">
+        Failed to load portfolio. Try logging in again.
+      </div>
     );
   }
 

@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useTheme } from "./theme-provider";
+import { useAuth } from "./auth-provider";
 
 export function Navbar() {
   const { theme, toggle } = useTheme();
+  const { isLoggedIn, username, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/80">
@@ -29,6 +31,24 @@ export function Navbar() {
           <Link href="/leaderboard" className="hover:text-neutral-900 dark:hover:text-white transition-colors">
             Leaderboard
           </Link>
+          {isLoggedIn ? (
+            <div className="flex items-center gap-3">
+              <span className="text-neutral-500">{username || "User"}</span>
+              <button
+                onClick={logout}
+                className="rounded-md px-2 py-1 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                Log out
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-md px-3 py-1.5 font-medium transition-colors bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+            >
+              Log in
+            </Link>
+          )}
           <button
             onClick={toggle}
             className="rounded-md p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"

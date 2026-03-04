@@ -26,8 +26,9 @@ type loginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
-type tokenResponse struct {
-	Token string `json:"token"`
+type authResponse struct {
+	Token   string `json:"token"`
+	Username string `json:"username"`
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
@@ -43,7 +44,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, tokenResponse{Token: token})
+	c.JSON(http.StatusCreated, authResponse{Token: token, Username: req.Username})
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
@@ -53,11 +54,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := h.Auth.Login(c.Request.Context(), req.Email, req.Password)
+	token, username, err := h.Auth.LoginWithUsername(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, tokenResponse{Token: token})
+	c.JSON(http.StatusOK, authResponse{Token: token, Username: username})
 }

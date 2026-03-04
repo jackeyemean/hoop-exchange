@@ -9,12 +9,12 @@ import { PriceChart } from "@/components/price-chart";
 import { TradePanel } from "@/components/trade-panel";
 import { formatCompact } from "@/lib/utils";
 
-type PriceRange = "all" | "season" | "month" | "week";
+type PriceRange = "all" | "season" | "month" | "week" | "day";
 
 export default function PlayerDetailPage() {
   const params = useParams();
   const id = Number(params.id);
-  const [range, setRange] = useState<PriceRange>("all");
+  const [range, setRange] = useState<PriceRange>("day");
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["player", id, range],
@@ -43,6 +43,17 @@ export default function PlayerDetailPage() {
     price: p.price,
   }));
 
+  // Compute % change for the displayed range (first vs last price in chart)
+  // formatPct expects decimal (0.05 = 5%), so we pass (last-first)/first
+  const rangeChangePct =
+    chartData.length >= 2 && chartData[0].price > 0
+      ? (chartData[chartData.length - 1].price - chartData[0].price) / chartData[0].price
+      : null;
+
+  const ticker =
+    ((player.firstName || "").replace(/[^a-zA-Z]/g, "").slice(0, 2) || (player.firstName || "").slice(0, 1)) +
+    ((player.lastName || "").replace(/[^a-zA-Z]/g, "").slice(0, 2) || (player.lastName || "").slice(0, 1));
+
   return (
     <div>
       <div className="mb-6">
@@ -50,6 +61,9 @@ export default function PlayerDetailPage() {
           <h1 className="text-2xl font-bold">
             {player.firstName} {player.lastName}
           </h1>
+          <span className="font-mono text-lg font-semibold text-neutral-500 dark:text-neutral-400">
+            ({(ticker || "—").toUpperCase()})
+          </span>
           <span className="text-sm text-neutral-500">
             {player.position} &middot; {player.teamAbbreviation}
           </span>
@@ -58,11 +72,11 @@ export default function PlayerDetailPage() {
           <div className="mt-2 flex items-baseline gap-4">
             <PriceBadge
               price={latestPrice.price}
-              changePct={latestPrice.changePct}
+              changePct={rangeChangePct}
               size="lg"
             />
             <span className="text-sm text-neutral-500">
-              MCap {formatCompact(latestPrice.marketCap)}
+              Market Cap: {formatCompact(latestPrice.marketCap)}
             </span>
           </div>
         )}
@@ -74,7 +88,7 @@ export default function PlayerDetailPage() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Price History</h2>
               <div className="flex gap-1 rounded-md border border-neutral-200 p-0.5 dark:border-neutral-700">
-                {(["all", "season", "month", "week"] as const).map((r) => (
+                {(["all", "season", "month", "week", "day"] as const).map((r) => (
                   <button
                     key={r}
                     onClick={() => setRange(r)}
@@ -84,7 +98,15 @@ export default function PlayerDetailPage() {
                         : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
                     }`}
                   >
-                    {r === "all" ? "All Time" : r === "season" ? "This Season" : r === "month" ? "Past Month" : "Past Week"}
+                    {r === "all"
+                      ? "All Time"
+                      : r === "season"
+                        ? "This Season"
+                        : r === "month"
+                          ? "Past Month"
+                            : r === "week"
+                            ? "Past Week"
+                            : "Past Game"}
                   </button>
                 ))}
               </div>
@@ -95,10 +117,10 @@ export default function PlayerDetailPage() {
           {latestPrice && (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[
-                { label: "Perf Score", value: latestPrice.perfScore?.toFixed(1) },
-                { label: "Age Mult", value: `${latestPrice.ageMult}x` },
-                { label: "Win% Mult", value: `${latestPrice.winPctMult}x` },
-                { label: "Injury Mult", value: `${latestPrice.salaryEffMult?.toFixed(3)}x` },
+                { label: "Performance Score", value: latestPrice.perfScore?.toFixed(1) },
+                { label: "Age Multiplier", value: `${latestPrice.ageMult}x` },
+                { label: "Win% Multiplier", value: `${latestPrice.winPctMult}x` },
+                { label: "Injury Multiplier", value: `${latestPrice.injuryMult?.toFixed(3)}x` },
               ].map((stat) => (
                 <div
                   key={stat.label}

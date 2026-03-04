@@ -27,7 +27,7 @@ export interface PricePoint {
   perfScore: number;
   ageMult: number;
   winPctMult: number;
-  salaryEffMult: number;
+  injuryMult: number;
 }
 
 export interface PlayerWithPrice extends PlayerSeason {

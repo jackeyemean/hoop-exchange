@@ -15,7 +15,7 @@ import { formatCurrency } from "@/lib/utils";
 interface PriceChartProps {
   data: { date: string; price: number }[];
   height?: number;
-  range?: "all" | "season" | "month" | "week";
+  range?: "all" | "season" | "month" | "week" | "day";
 }
 
 export function PriceChart({ data, height = 300, range = "all" }: PriceChartProps) {
@@ -36,7 +36,7 @@ export function PriceChart({ data, height = 300, range = "all" }: PriceChartProp
   const gradientId = `priceGradient-${isPositive ? "up" : "down"}`;
 
   const chartData = useMemo(() => {
-    const useDateAxis = range === "all" || data.length > 60;
+    const useDateAxis = range === "all" || range === "day" || data.length > 60;
     return data.map((d, i) => ({
       ...d,
       day: i + 1,
@@ -68,12 +68,12 @@ export function PriceChart({ data, height = 300, range = "all" }: PriceChartProp
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#333" opacity={0.1} />
         <XAxis
-          dataKey={range === "all" || data.length > 60 ? "label" : "day"}
+          dataKey={range === "all" || range === "day" || data.length > 60 ? "label" : "day"}
           tick={{ fontSize: 10 }}
           stroke="#888"
           tickLine={false}
           label={{
-            value: range === "all" || data.length > 60 ? "Date" : "Trading Day",
+            value: range === "all" || range === "day" || data.length > 60 ? "Date" : "Trading Day",
             position: "insideBottomRight",
             offset: -5,
             fontSize: 11,

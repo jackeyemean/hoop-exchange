@@ -50,7 +50,7 @@ func (h *PlayerHandler) GetDetail(c *gin.Context) {
 	}
 
 	rangeFilter := c.DefaultQuery("range", "all")
-	if rangeFilter != "all" && rangeFilter != "season" && rangeFilter != "month" && rangeFilter != "week" {
+	if rangeFilter != "all" && rangeFilter != "season" && rangeFilter != "month" && rangeFilter != "week" && rangeFilter != "day" {
 		rangeFilter = "all"
 	}
 

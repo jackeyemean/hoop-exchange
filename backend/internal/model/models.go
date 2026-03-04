@@ -115,7 +115,7 @@ type PriceHistory struct {
 	PerfScore       float64   `json:"perfScore"`
 	AgeMult         float64   `json:"ageMult"`
 	WinPctMult      float64   `json:"winPctMult"`
-	SalaryEffMult   float64   `json:"salaryEffMult"`
+	SalaryEffMult   float64   `json:"injuryMult"` // DB column is salary_eff_mult; stores injury multiplier
 	RawScore        float64   `json:"rawScore"`
 	Price           float64   `json:"price"`
 	MarketCap       float64   `json:"marketCap"`

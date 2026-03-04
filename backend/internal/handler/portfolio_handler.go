@@ -61,7 +61,7 @@ func (h *PortfolioHandler) ListTrades(c *gin.Context) {
 		limit = 50
 	}
 
-	trades, err := h.Trades.ListByUserID(c.Request.Context(), userID, limit)
+	trades, err := h.Trades.ListByUserIDWithPlayer(c.Request.Context(), userID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch trades"})
 		return
