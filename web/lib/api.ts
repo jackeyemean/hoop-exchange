@@ -48,6 +48,13 @@ class ApiClient {
     return this.request<{ id: string; email: string; username: string }>("/api/auth/me");
   }
 
+  updateUsername(username: string) {
+    return this.request<{ username: string }>("/api/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify({ username }),
+    });
+  }
+
   // Players
   getPlayers() {
     return this.request<{ players: any[] }>("/api/players");

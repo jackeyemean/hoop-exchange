@@ -13,10 +13,19 @@ function LoginContent() {
     setError(searchParams.get("error"));
   }, [searchParams]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname + (window.location.search || ""));
+    }
+  }, []);
+
   const handleGoogleSignIn = async () => {
     setError(null);
     setLoading(true);
     try {
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", window.location.pathname + (window.location.search || ""));
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {

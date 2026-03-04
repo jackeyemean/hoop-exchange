@@ -16,14 +16,9 @@ function AuthCallbackContent() {
     const next = searchParams.get("next") ?? "/";
     let cancelled = false;
 
-    const completeLogin = (session: { access_token: string; user?: { user_metadata?: { full_name?: string }; email?: string } }) => {
+    const completeLogin = (session: { access_token: string }) => {
       if (cancelled) return;
-      login(
-        session.access_token,
-        session.user?.user_metadata?.full_name ??
-          session.user?.email ??
-          undefined
-      );
+      login(session.access_token);
       router.replace(next);
     };
 

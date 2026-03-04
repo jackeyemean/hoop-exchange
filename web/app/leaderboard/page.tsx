@@ -66,7 +66,7 @@ export default function LeaderboardPage() {
                   <td className="px-4 py-3 text-right font-mono text-neutral-500">
                     {formatCurrency(entry.cashBalance)}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-semibold">
+                  <td className="px-4 py-3 text-right font-mono">
                     {formatCurrency(entry.totalValue)}
                   </td>
                 </tr>

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -60,32 +62,31 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User
 }
 
 // CreateOAuth creates a user from OAuth (Google) - no password.
-// On username conflict (rare when emails truncate identically), falls back to user_<id>.
-func (r *UserRepository) CreateOAuth(ctx context.Context, id uuid.UUID, email, username string) error {
-	_, err := r.Pool.Exec(ctx,
-		`INSERT INTO users (id, email, username, password_hash)
-		 VALUES ($1, $2, $3, NULL)
-		 ON CONFLICT (id) DO NOTHING`,
-		id, email, username,
-	)
-	if err != nil {
-		// Retry with unique username on conflict (e.g. two emails truncate to same 50 chars)
-		if isUniqueViolation(err) {
-			fallback := "user_" + id.String()[:8]
-			_, err2 := r.Pool.Exec(ctx,
-				`INSERT INTO users (id, email, username, password_hash)
-				 VALUES ($1, $2, $3, NULL)
-				 ON CONFLICT (id) DO NOTHING`,
-				id, email, fallback,
-			)
-			if err2 != nil {
-				return fmt.Errorf("create oauth user: %w", err2)
-			}
-			return nil
+// Assigns default username "userN" using a sequence (unique, no duplicates).
+func (r *UserRepository) CreateOAuth(ctx context.Context, id uuid.UUID, email string) error {
+	for i := 0; i < 10; i++ {
+		var n int64
+		err := r.Pool.QueryRow(ctx, `SELECT nextval('user_username_seq')`).Scan(&n)
+		if err != nil {
+			return fmt.Errorf("create oauth user: %w", err)
 		}
-		return fmt.Errorf("create oauth user: %w", err)
+		username := "user" + strconv.FormatInt(n, 10)
+
+		_, err = r.Pool.Exec(ctx,
+			`INSERT INTO users (id, email, username, password_hash)
+			 VALUES ($1, $2, $3, NULL)
+			 ON CONFLICT (id) DO NOTHING`,
+			id, email, username,
+		)
+		if err != nil {
+			if isUniqueViolation(err) {
+				continue // username taken (legacy user), retry with next number
+			}
+			return fmt.Errorf("create oauth user: %w", err)
+		}
+		return nil
 	}
-	return nil
+	return fmt.Errorf("create oauth user: could not assign unique username")
 }
 
 func isUniqueViolation(err error) bool {
@@ -94,4 +95,20 @@ func isUniqueViolation(err error) bool {
 		return pgErr.Code == "23505" // unique_violation
 	}
 	return false
+}
+
+// UpdateUsername updates the user's display username.
+func (r *UserRepository) UpdateUsername(ctx context.Context, userID uuid.UUID, username string) error {
+	username = strings.TrimSpace(username)
+	_, err := r.Pool.Exec(ctx,
+		`UPDATE users SET username = $1 WHERE id = $2`,
+		username, userID,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return fmt.Errorf("username is already taken")
+		}
+		return fmt.Errorf("update username: %w", err)
+	}
+	return nil
 }

@@ -59,7 +59,7 @@ func (s *TradingService) PlaceOrder(ctx context.Context, userID uuid.UUID, playe
 			return nil, fmt.Errorf("get wallet: %w", err)
 		}
 		if balance < total {
-			return nil, errors.New("insufficient balance")
+			return nil, errors.New("you don't have enough cash for this purchase")
 		}
 
 		_, err = tx.Exec(ctx,
@@ -107,10 +107,13 @@ func (s *TradingService) PlaceOrder(ctx context.Context, userID uuid.UUID, playe
 			userID, playerSeasonID,
 		).Scan(&posQty)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, errors.New("you don't have any shares of this player to sell")
+			}
 			return nil, fmt.Errorf("get position: %w", err)
 		}
 		if posQty < quantity {
-			return nil, errors.New("insufficient shares")
+			return nil, errors.New("you don't have enough shares to sell that many")
 		}
 
 		_, err = tx.Exec(ctx,

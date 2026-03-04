@@ -61,7 +61,7 @@ func main() {
 
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -89,6 +89,7 @@ func main() {
 		protected.Use(middleware.AuthRequired(cfg.SupabaseJWTSecret, cfg.SupabaseURL, userRepo, walletRepo, cfg.StartingBalance))
 		{
 			protected.GET("/auth/me", authH.Me)
+			protected.PATCH("/auth/me", authH.UpdateUsername)
 			protected.POST("/orders",
 				abuseGuard.Middleware(),
 				middleware.MarketOpen(

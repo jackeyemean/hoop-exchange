@@ -1,4 +1,4 @@
-# PlayerExchange
+# Hoop Exchange
 
 A fan simulation stock exchange where basketball players are tradable assets. Prices are derived from real game stats using a deterministic formula. No real money involved.
 
@@ -66,6 +66,7 @@ psql $DATABASE_URL -f migrations/003_index_history_precision.up.sql
 psql $DATABASE_URL -f migrations/004_index_ticker_and_types.up.sql
 psql $DATABASE_URL -f migrations/005_renaissance_ipo_index.up.sql
 psql $DATABASE_URL -f migrations/006_oauth_users.up.sql
+psql $DATABASE_URL -f migrations/007_user_username_seq.up.sql
 ```
 
 ### 3. Set up Supabase Auth (Google)
@@ -173,7 +174,7 @@ Use a wrapper script that replicates the schedule logic (Monday = ingest Fri–S
 
 ```bash
 #!/bin/bash
-cd /path/to/nba-exchange/engine
+cd /path/to/hoop-exchange/engine
 SEASON="2025-26"
 TODAY=$(date +%Y-%m-%d)
 if [ "$(date +%u)" = "1" ]; then
@@ -196,17 +197,17 @@ Then add to crontab (8:00 AM ET weekdays): `0 8 * * 1-5 /path/to/run_daily.sh`
 
 ### Option 3: systemd (Linux)
 
-Create `/etc/systemd/system/nba-exchange-engine.service`:
+Create `/etc/systemd/system/hoop-exchange-engine.service`:
 
 ```ini
 [Unit]
-Description=NBA Exchange Engine Scheduler
+Description=Hoop Exchange Engine Scheduler
 After=network.target postgresql.service
 
 [Service]
 Type=simple
 User=youruser
-WorkingDirectory=/path/to/nba-exchange/engine
+WorkingDirectory=/path/to/hoop-exchange/engine
 ExecStart=/usr/bin/python3 main.py schedule --season 2025-26
 Restart=always
 RestartSec=60
@@ -220,6 +221,6 @@ Then:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable nba-exchange-engine
-sudo systemctl start nba-exchange-engine
+sudo systemctl enable hoop-exchange-engine
+sudo systemctl start hoop-exchange-engine
 ```

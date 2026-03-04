@@ -190,12 +190,12 @@ func ensureUserAndWallet(ctx context.Context, userRepo *repository.UserRepositor
 		return nil
 	}
 
-	_, email, username, err := parseSupabaseTokenForSync(tokenStr, secret, supabaseURL)
+	_, email, _, err := parseSupabaseTokenForSync(tokenStr, secret, supabaseURL)
 	if err != nil {
 		return err
 	}
 
-	if err := userRepo.CreateOAuth(ctx, userID, email, username); err != nil {
+	if err := userRepo.CreateOAuth(ctx, userID, email); err != nil {
 		return err
 	}
 	if err := walletRepo.CreateIfNotExists(ctx, userID, startingBalance); err != nil {
