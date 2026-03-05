@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
@@ -29,6 +29,38 @@ export function TradePanel({
   const confirmDialogRef = useRef<HTMLDialogElement>(null);
 
   const total = quantity * currentPrice;
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearHold = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const startHold = useCallback(
+    (delta: number) => {
+      const step = () =>
+        setQuantity((q) => {
+          const next = q + delta;
+          if (next < 1) {
+            clearHold();
+            return 1;
+          }
+          return next;
+        });
+      step(); // immediate
+      timeoutRef.current = setTimeout(() => {
+        intervalRef.current = setInterval(step, 80);
+      }, 400);
+    },
+    [clearHold]
+  );
 
   const openConfirm = () => {
     setError(null);
@@ -107,13 +139,43 @@ export function TradePanel({
       </div>
 
       <label className="mb-1 block text-xs text-neutral-500">Shares</label>
-      <input
-        type="number"
-        min={1}
-        value={quantity}
-        onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-        className="mb-3 w-full rounded-md border border-neutral-200 bg-transparent px-3 py-2 text-sm dark:border-neutral-700"
-      />
+      <div className="mb-3 flex rounded-md border border-neutral-200 dark:border-neutral-700">
+        <button
+          type="button"
+          onMouseDown={() => startHold(-1)}
+          onMouseUp={clearHold}
+          onMouseLeave={clearHold}
+          onTouchStart={() => startHold(-1)}
+          onTouchEnd={clearHold}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-l-md border-r border-neutral-200 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+          aria-label="Decrease"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+          </svg>
+        </button>
+        <input
+          type="number"
+          min={1}
+          value={quantity}
+          onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+          className="w-full border-0 bg-transparent px-3 py-2 text-center text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none dark:bg-transparent"
+        />
+        <button
+          type="button"
+          onMouseDown={() => startHold(1)}
+          onMouseUp={clearHold}
+          onMouseLeave={clearHold}
+          onTouchStart={() => startHold(1)}
+          onTouchEnd={clearHold}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-r-md border-l border-neutral-200 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+          aria-label="Increase"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      </div>
 
       <div className="mb-3 flex items-center justify-between text-sm">
         <span className="text-neutral-500">Price</span>

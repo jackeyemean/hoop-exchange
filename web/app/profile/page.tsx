@@ -29,7 +29,7 @@ export default function ProfilePage() {
       const msg = e.message || "Failed to update username";
       setError(
         msg.toLowerCase().includes("different username")
-          ? "Very funny…"
+          ? "very funny…"
           : msg
       );
     } finally {
@@ -63,7 +63,7 @@ export default function ProfilePage() {
     <div>
       <h1 className="mb-2 text-2xl font-bold">Profile</h1>
       <p className="mb-8 text-neutral-500">
-        Your username is shown on the leaderboard (max 16 characters).
+        Your username is shown on the leaderboard (max 23 characters).
       </p>
 
       <form onSubmit={handleSubmit} className="max-w-md">
@@ -75,7 +75,7 @@ export default function ProfilePage() {
           value={newUsername}
           onChange={(e) => setNewUsername(e.target.value)}
           placeholder="e.g. hoop_fan_42"
-          maxLength={16}
+          maxLength={23}
           className="mb-4 w-full rounded-lg border border-neutral-200 bg-white px-4 py-2.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
         />
         {error && (

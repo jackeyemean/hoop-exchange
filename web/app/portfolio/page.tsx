@@ -200,7 +200,7 @@ export default function PortfolioPage() {
               Start trading on the Discover page to build your portfolio.
             </p>
             <Link
-              href="/discover"
+              href="/"
               className="inline-block rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
             >
               Discover players

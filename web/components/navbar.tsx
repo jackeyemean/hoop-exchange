@@ -28,7 +28,7 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
 
 export function Navbar() {
   const { theme, toggle } = useTheme();
-  const { isLoggedIn, username } = useAuth();
+  const { isLoggedIn } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white/80 backdrop-blur-md dark:border-neutral-800 dark:bg-neutral-950/80">
@@ -41,26 +41,23 @@ export function Navbar() {
         </Link>
 
         <div className="flex items-center gap-6 text-sm font-medium">
+          <NavLink href="/rules">Rules</NavLink>
           <NavLink href="/">Discover</NavLink>
           <NavLink href="/indexes">Indexes</NavLink>
           <NavLink href="/portfolio">Portfolio</NavLink>
           <NavLink href="/leaderboard">Leaderboard</NavLink>
-          {isLoggedIn ? (
-            <div className="flex items-center gap-3">
-              <Link
-                href="/profile"
-                className="text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
-              >
-                {username || "User"}
-              </Link>
+          {isLoggedIn && (
+            <>
+              <NavLink href="/profile">Profile</NavLink>
               <Link
                 href="/logout"
                 className="rounded-md px-2 py-1 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
               >
                 Log out
               </Link>
-            </div>
-          ) : (
+            </>
+          )}
+          {!isLoggedIn && (
             <Link
               href="/login"
               className="rounded-md px-3 py-1.5 font-medium transition-colors bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
