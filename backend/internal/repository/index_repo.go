@@ -32,6 +32,13 @@ func (r *IndexRepository) GetByID(ctx context.Context, id int) (*model.Index, er
 	return idx, nil
 }
 
+// IndexWithPrices extends Index with latest level and daily change % (curr_day vs prev_day).
+type IndexWithPrices struct {
+	model.Index
+	Level     *float64 `json:"level,omitempty"`
+	ChangePct *float64 `json:"changePct,omitempty"`
+}
+
 func (r *IndexRepository) ListAll(ctx context.Context) ([]model.Index, error) {
 	rows, err := r.Pool.Query(ctx,
 		`SELECT i.id, i.name, i.index_type, i.description, i.ticker, i.team_id, i.created_at,
@@ -53,6 +60,55 @@ func (r *IndexRepository) ListAll(ctx context.Context) ([]model.Index, error) {
 			return nil, fmt.Errorf("scan index: %w", err)
 		}
 		results = append(results, idx)
+	}
+	return results, rows.Err()
+}
+
+func (r *IndexRepository) ListAllWithPrices(ctx context.Context) ([]IndexWithPrices, error) {
+	rows, err := r.Pool.Query(ctx,
+		`SELECT i.id, i.name, i.index_type, i.description, i.ticker, i.team_id, i.created_at,
+		        t.abbreviation,
+		        ih.level,
+		        CASE WHEN prev_day.level IS NOT NULL AND prev_day.level > 0
+		             THEN ROUND((curr_day.level - prev_day.level) / prev_day.level, 6)
+		             ELSE NULL
+		        END AS change_pct
+		 FROM indexes i
+		 LEFT JOIN teams t ON t.id = i.team_id
+		 LEFT JOIN LATERAL (
+		     SELECT level FROM index_history
+		     WHERE index_id = i.id
+		     ORDER BY trade_date DESC
+		     OFFSET 1 LIMIT 1
+		 ) curr_day ON true
+		 LEFT JOIN LATERAL (
+		     SELECT level FROM index_history
+		     WHERE index_id = i.id
+		     ORDER BY trade_date DESC
+		     OFFSET 2 LIMIT 1
+		 ) prev_day ON true
+		 LEFT JOIN LATERAL (
+		     SELECT level FROM index_history
+		     WHERE index_id = i.id
+		     ORDER BY trade_date DESC
+		     LIMIT 1
+		 ) ih ON true
+		 ORDER BY i.name`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list indexes with prices: %w", err)
+	}
+	defer rows.Close()
+
+	var results []IndexWithPrices
+	for rows.Next() {
+		var iw IndexWithPrices
+		err := rows.Scan(&iw.ID, &iw.Name, &iw.IndexType, &iw.Description, &iw.Ticker, &iw.TeamID, &iw.CreatedAt, &iw.TeamAbbreviation,
+			&iw.Level, &iw.ChangePct)
+		if err != nil {
+			return nil, fmt.Errorf("scan index with prices: %w", err)
+		}
+		results = append(results, iw)
 	}
 	return results, rows.Err()
 }

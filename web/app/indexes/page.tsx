@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { formatPct, pctColor } from "@/lib/utils";
 
 const TEAM_NAME_TO_ABBREV: Record<string, string> = {
   "Atlanta Hawks": "ATL", "Boston Celtics": "BOS", "Brooklyn Nets": "BKN",
@@ -119,21 +120,35 @@ export default function IndexesPage() {
                     <Link
                       key={idx.id}
                       href={`/indexes/${idx.id}`}
-                      className="rounded-lg border border-neutral-200 p-4 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+                      className="block rounded-lg border border-neutral-200 p-3 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium text-neutral-900 dark:text-white">
-                          {displayName(idx.name)}
-                        </span>
-                        <span className="shrink-0 font-mono text-xs text-neutral-500">
-                          {getIndexTicker(idx)}
-                        </span>
-                      </div>
-                      {idx.description && (
-                        <div className="mt-1 text-xs text-neutral-500">
-                          {idx.description}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-neutral-900 dark:text-white">
+                              {displayName(idx.name)}
+                            </span>
+                            <span className="shrink-0 font-mono text-xs text-neutral-500">
+                              {getIndexTicker(idx)}
+                            </span>
+                          </div>
+                          {idx.description && (
+                            <div className="mt-2 line-clamp-2 text-xs text-neutral-500 dark:text-neutral-400">
+                              {idx.description}
+                            </div>
+                          )}
                         </div>
-                      )}
+                        <div className="shrink-0 text-right">
+                          <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                            {idx.level != null ? idx.level.toFixed(2) : "—"}
+                          </div>
+                          {idx.changePct != null && (
+                            <div className={`mt-0.5 text-sm ${pctColor(idx.changePct)}`}>
+                              {formatPct(idx.changePct)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -149,21 +164,35 @@ export default function IndexesPage() {
             <Link
               key={idx.id}
               href={`/indexes/${idx.id}`}
-              className="rounded-lg border border-neutral-200 p-4 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+              className="block rounded-lg border border-neutral-200 p-3 transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium text-neutral-900 dark:text-white">
-                  {displayName(idx.name)}
-                </span>
-                <span className="shrink-0 font-mono text-xs text-neutral-500">
-                  {getIndexTicker(idx)}
-                </span>
-              </div>
-              {idx.description && (
-                <div className="mt-1 text-xs text-neutral-500">
-                  {idx.description}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-neutral-900 dark:text-white">
+                      {displayName(idx.name)}
+                    </span>
+                    <span className="shrink-0 font-mono text-xs text-neutral-500">
+                      {getIndexTicker(idx)}
+                    </span>
+                  </div>
+                  {idx.description && (
+                    <div className="mt-2 line-clamp-2 text-xs text-neutral-500 dark:text-neutral-400">
+                      {idx.description}
+                    </div>
+                  )}
                 </div>
-              )}
+                <div className="shrink-0 text-right">
+                  <div className="text-sm text-neutral-500 dark:text-neutral-400">
+                    {idx.level != null ? idx.level.toFixed(2) : "—"}
+                  </div>
+                  {idx.changePct != null && (
+                    <div className={`mt-0.5 text-sm ${pctColor(idx.changePct)}`}>
+                      {formatPct(idx.changePct)}
+                    </div>
+                  )}
+                </div>
+              </div>
             </Link>
           ))}
         </div>

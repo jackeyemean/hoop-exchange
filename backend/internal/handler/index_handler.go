@@ -17,7 +17,7 @@ func NewIndexHandler(indexes *repository.IndexRepository) *IndexHandler {
 }
 
 func (h *IndexHandler) ListIndexes(c *gin.Context) {
-	indexes, err := h.Indexes.ListAll(c.Request.Context())
+	indexes, err := h.Indexes.ListAllWithPrices(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch indexes"})
 		return

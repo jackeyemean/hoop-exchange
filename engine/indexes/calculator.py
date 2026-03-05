@@ -14,14 +14,14 @@ def setup_default_indexes(conn, season_id: int):
     log.info("Setting up default indexes for season %d", season_id)
 
     # Market-cap-ranked indexes (cap-weighted, top N by market cap)
-    _upsert_index(conn, "S&P 500", "sp500", "Cap-weighted index of top 500 players by market cap", ticker="INX")
-    _upsert_index(conn, "S&P 100", "sp100", "Cap-weighted index of top 100 players by market cap", ticker="OEX")
-    _upsert_index(conn, "Dow Jones Industrial Average", "djia", "Cap-weighted index of top 30 players by market cap", ticker="DJIA")
+    _upsert_index(conn, "S&P 500", "sp500", "Top 500 players by market cap", ticker="INX")
+    _upsert_index(conn, "S&P 100", "sp100", "Top 100 players by market cap", ticker="OEX")
+    _upsert_index(conn, "Dow Jones Industrial Average", "djia", "Top 30 players by market cap", ticker="DJIA")
 
     # Tier-based indexes (all players in tier, cap-weighted)
-    _upsert_index(conn, "Magnificent 7", "tier_mag7", "Cap-weighted index of all Magnificent 7 tier players", ticker="MAG7")
-    _upsert_index(conn, "Blue Chips", "tier_bluechip", "Cap-weighted index of all Blue Chip tier players", ticker="BLUE")
-    _upsert_index(conn, "Renaissance IPO Index", "ipo", "Cap-weighted index of all rookies in the current season", ticker="IPO")
+    _upsert_index(conn, "Magnificent 7", "tier_mag7", "Elite tier of the highest-valued players", ticker="MAG7")
+    _upsert_index(conn, "Blue Chips", "tier_bluechip", "Established, high-value players", ticker="BLUE")
+    _upsert_index(conn, "Renaissance IPO Index", "ipo", "Rookies from the current draft class", ticker="IPO")
 
     with conn.cursor() as cur:
         cur.execute("SELECT id, name FROM teams")
@@ -29,11 +29,11 @@ def setup_default_indexes(conn, season_id: int):
 
     for team_id, team_name in teams:
         _upsert_index(conn, f"{team_name} Index", "team",
-                       f"Cap-weighted index for {team_name}", team_id=team_id)
+                       f"Roster for {team_name}", team_id=team_id)
 
     for group_name in POSITION_GROUPS:
         _upsert_index(conn, f"{group_name} Index", "position",
-                       f"Cap-weighted index for {group_name.lower()}")
+                       f"All {group_name.lower()}")
 
     # Remove momentum index if it exists (causes level overflow from extreme returns)
     with conn.cursor() as cur:

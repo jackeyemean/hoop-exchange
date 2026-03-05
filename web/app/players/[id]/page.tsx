@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { PriceBadge } from "@/components/price-badge";
 import { PriceChart } from "@/components/price-chart";
+import { TierBadge } from "@/components/tier-badge";
 import { TradePanel } from "@/components/trade-panel";
 import { formatCompact } from "@/lib/utils";
 
@@ -57,7 +58,7 @@ export default function PlayerDetailPage() {
   return (
     <div>
       <div className="mb-6">
-        <div className="flex items-baseline gap-2">
+        <div className="flex flex-wrap items-baseline gap-2">
           <h1 className="text-2xl font-bold">
             {player.firstName} {player.lastName}
           </h1>
@@ -67,6 +68,9 @@ export default function PlayerDetailPage() {
           <span className="text-sm text-neutral-500">
             {player.position} &middot; {player.teamAbbreviation}
           </span>
+          {player.tier && (
+            <TierBadge tier={player.tier} />
+          )}
         </div>
         {latestPrice && (
           <div className="mt-2 flex items-baseline gap-4">
