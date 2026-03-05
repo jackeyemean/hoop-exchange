@@ -113,11 +113,13 @@ export default function RulesPage() {
             </p>
           </div>
         </div>
+        <ul className="mt-4 space-y-1 text-xs text-neutral-500 dark:text-neutral-500">
+          <li>For rookie IPOs, tiers are assigned by draft position</li>
+          <li>Lottery (1–14) → Growth</li>
+          <li>First round / early second (15–39) → Mid Cap</li>
+          <li>Everyone else → Penny Stock</li>
+        </ul>
       </section>
-
-      <p className="mt-12 text-xs text-neutral-500">
-        Fan simulation. No real money. Not affiliated with any league.
-      </p>
     </div>
   );
 }
