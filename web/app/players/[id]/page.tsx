@@ -106,7 +106,7 @@ export default function PlayerDetailPage() {
                           ? "Past Month"
                             : r === "week"
                             ? "Past Week"
-                            : "Past Game"}
+                            : "Past Day"}
                   </button>
                 ))}
               </div>

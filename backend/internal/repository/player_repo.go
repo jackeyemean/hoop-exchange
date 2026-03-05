@@ -98,16 +98,16 @@ func (r *PlayerRepository) ListActiveWithPrices(ctx context.Context, seasonID in
 		`SELECT ps.id, p.first_name, p.last_name, COALESCE(p.position, ''), t.abbreviation,
 		        ps.tier::text, ps.float_shares, ps.status::text,
 		        ph.price,
-		        CASE WHEN prev.price IS NOT NULL AND prev.price > 0
-		             THEN ROUND((ph.price - prev.price) / prev.price, 4)
-		             ELSE ph.change_pct
+		        CASE WHEN prev_day.price IS NOT NULL AND prev_day.price > 0
+		             THEN ROUND((curr_day.price - prev_day.price) / prev_day.price, 6)
+		             ELSE NULL
 		        END AS change_pct,
 		        ph.market_cap
 		 FROM player_seasons ps
 		 JOIN players p ON p.id = ps.player_id
 		 JOIN teams t ON t.id = ps.team_id
 		 LEFT JOIN LATERAL (
-		     SELECT price, change_pct, market_cap
+		     SELECT price, market_cap
 		     FROM price_history
 		     WHERE player_season_id = ps.id
 		     ORDER BY trade_date DESC
@@ -116,10 +116,15 @@ func (r *PlayerRepository) ListActiveWithPrices(ctx context.Context, seasonID in
 		 LEFT JOIN LATERAL (
 		     SELECT price FROM price_history
 		     WHERE player_season_id = ps.id
-		       AND price IS DISTINCT FROM ph.price
 		     ORDER BY trade_date DESC
-		     LIMIT 1
-		 ) prev ON true
+		     OFFSET 1 LIMIT 1
+		 ) curr_day ON true
+		 LEFT JOIN LATERAL (
+		     SELECT price FROM price_history
+		     WHERE player_season_id = ps.id
+		     ORDER BY trade_date DESC
+		     OFFSET 2 LIMIT 1
+		 ) prev_day ON true
 		 WHERE ps.season_id = $1 AND ps.status NOT IN ('delisted')
 		 ORDER BY ph.market_cap DESC NULLS LAST`,
 		seasonID,
@@ -153,11 +158,11 @@ func (r *PlayerRepository) GetLatestPrice(ctx context.Context, playerSeasonID in
 		     WHERE player_season_id = $1
 		     ORDER BY trade_date DESC LIMIT 1
 		 ),
-		 prev_diff AS (
+		 prev_day AS (
 		     SELECT price FROM price_history
 		     WHERE player_season_id = $1
-		       AND price IS DISTINCT FROM (SELECT price FROM latest)
-		     ORDER BY trade_date DESC LIMIT 1
+		     ORDER BY trade_date DESC
+		     OFFSET 1 LIMIT 1
 		 )
 		 SELECT l.id, l.player_season_id, l.trade_date, l.perf_score, l.age_mult, l.win_pct_mult,
 		        l.salary_eff_mult, l.raw_score, l.price, l.market_cap, l.prev_price,
@@ -167,7 +172,7 @@ func (r *PlayerRepository) GetLatestPrice(ctx context.Context, playerSeasonID in
 		        END,
 		        l.created_at
 		 FROM latest l
-		 LEFT JOIN LATERAL (SELECT price FROM prev_diff) pd ON true`,
+		 LEFT JOIN LATERAL (SELECT price FROM prev_day) pd ON true`,
 		playerSeasonID,
 	).Scan(&ph.ID, &ph.PlayerSeasonID, &ph.TradeDate, &ph.PerfScore, &ph.AgeMult, &ph.WinPctMult,
 		&ph.SalaryEffMult, &ph.RawScore, &ph.Price, &ph.MarketCap, &ph.PrevPrice, &ph.ChangePct, &ph.CreatedAt)
@@ -225,23 +230,26 @@ func (r *PlayerRepository) GetPriceHistoryForPlayer(ctx context.Context, playerI
 
 	switch rangeFilter {
 	case RangeDay:
-		// Same 2 points the home page "change" uses: latest price + previous distinct price
-		// (prev is most recent row where price differs from latest, so the line shows the day-over-day change)
-		query = `WITH latest AS (
-		             SELECT price, trade_date FROM price_history
-		             WHERE player_season_id = $1 ORDER BY trade_date DESC LIMIT 1
+		// Last complete trading day + previous: curr_day (e.g. Mar 4) and prev_day (e.g. Mar 3)
+		// Price at trade_date X = adjustments from games the calendar day before X
+		query = `WITH curr_day AS (
+		             SELECT trade_date FROM price_history
+		             WHERE player_season_id = $1
+		             ORDER BY trade_date DESC
+		             OFFSET 1 LIMIT 1
 		         ),
-		         prev AS (
-		             SELECT ph.trade_date FROM price_history ph, latest l
-		             WHERE ph.player_season_id = $1 AND ph.price IS DISTINCT FROM l.price
-		             ORDER BY ph.trade_date DESC LIMIT 1
+		         prev_day AS (
+		             SELECT trade_date FROM price_history
+		             WHERE player_season_id = $1
+		             ORDER BY trade_date DESC
+		             OFFSET 2 LIMIT 1
 		         )
 		         SELECT ph.id, ph.player_season_id, ph.trade_date, ph.perf_score, ph.age_mult, ph.win_pct_mult,
 		                ph.salary_eff_mult, ph.raw_score, ph.price, ph.market_cap, ph.prev_price, ph.change_pct, ph.created_at
 		         FROM price_history ph
 		         WHERE ph.player_season_id = $1
-		         AND (ph.trade_date = (SELECT trade_date FROM latest)
-		              OR ph.trade_date = (SELECT trade_date FROM prev))
+		         AND (ph.trade_date = (SELECT trade_date FROM curr_day)
+		              OR ph.trade_date = (SELECT trade_date FROM prev_day))
 		         ORDER BY ph.trade_date ASC`
 		args = []interface{}{playerSeasonID}
 	case RangeSeason:

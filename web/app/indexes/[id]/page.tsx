@@ -138,7 +138,7 @@ export default function IndexDetailPage() {
                 {formatPct(rangeChangePct)}
               </span>
               <span className="text-xs text-neutral-500">
-                {range === "all" ? "All time" : range === "season" ? "This season" : range === "month" ? "Past month" : range === "week" ? "Past week" : "Past game"}
+                {range === "all" ? "All time" : range === "season" ? "This season" : range === "month" ? "Past month" : range === "week" ? "Past week" : "Past Day"}
               </span>
             </>
           )}
@@ -159,7 +159,7 @@ export default function IndexDetailPage() {
                     : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
                 }`}
               >
-                {r === "all" ? "All Time" : r === "season" ? "This Season" : r === "month" ? "Past Month" : r === "week" ? "Past Week" : "Past Game"}
+                {r === "all" ? "All Time" : r === "season" ? "This Season" : r === "month" ? "Past Month" : r === "week" ? "Past Week" : "Past Day"}
               </button>
             ))}
           </div>

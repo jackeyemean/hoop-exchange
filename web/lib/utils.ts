@@ -41,3 +41,20 @@ export function pctColor(value: number | null): string {
   if (value < 0) return "text-red-600 dark:text-red-400";
   return "text-muted-foreground";
 }
+
+/** Format a trade date (YYYY-MM-DD or ISO string) as local calendar date, avoiding timezone shift. */
+export function formatChartDate(
+  dateStr: string,
+  opts?: { includeYear?: boolean; fullYear?: boolean }
+): string {
+  const match = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return dateStr;
+  const [, y, m, d] = match;
+  const date = new Date(Number(y), Number(m) - 1, Number(d));
+  const yearOpt = opts?.fullYear ? "numeric" : opts?.includeYear ? "2-digit" : undefined;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: yearOpt,
+  });
+}

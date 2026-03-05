@@ -35,6 +35,7 @@ func (h *IndexHandler) GetIndex(c *gin.Context) {
 
 	rangeParam := c.DefaultQuery("range", "season")
 	limit := 80
+	offset := 0
 	switch rangeParam {
 	case "all":
 		limit = 365
@@ -46,6 +47,7 @@ func (h *IndexHandler) GetIndex(c *gin.Context) {
 		limit = 5
 	case "day":
 		limit = 2
+		offset = 1 // curr_day and prev_day (last complete trading day), not today
 	}
 
 	index, err := h.Indexes.GetByID(c.Request.Context(), id)
@@ -60,7 +62,7 @@ func (h *IndexHandler) GetIndex(c *gin.Context) {
 		return
 	}
 
-	history, err := h.Indexes.GetHistory(c.Request.Context(), id, limit)
+	history, err := h.Indexes.GetHistory(c.Request.Context(), id, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch index history"})
 		return

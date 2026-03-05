@@ -10,7 +10,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { formatCurrency } from "@/lib/utils";
+import { formatChartDate, formatCurrency } from "@/lib/utils";
 
 interface PriceChartProps {
   data: { date: string; price: number }[];
@@ -41,7 +41,7 @@ export function PriceChart({ data, height = 300, range = "all" }: PriceChartProp
       ...d,
       day: i + 1,
       label: useDateAxis && d.date
-        ? new Date(d.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: range === "all" ? "2-digit" : undefined })
+        ? formatChartDate(d.date, { includeYear: range === "all" })
         : `Day ${i + 1}`,
     }));
   }, [data, range]);
@@ -50,12 +50,19 @@ export function PriceChart({ data, height = 300, range = "all" }: PriceChartProp
     const prices = data.map((d) => d.price);
     const min = Math.min(...prices);
     const max = Math.max(...prices);
-    const padding = Math.max((max - min) * 0.15, max * 0.02);
+    const priceRange = max - min;
+    const avgPrice = (min + max) / 2;
+    // For "day" range with 2 points: use min 3% domain range so small changes (e.g. win multiplier) are visible
+    const minRange = range === "day" && data.length === 2 ? avgPrice * 0.03 : 0;
+    const effectiveRange = Math.max(priceRange, minRange);
+    const padding = Math.max(effectiveRange * 0.15, max * 0.02);
+    const halfPadding = (effectiveRange + padding * 2) / 2;
+    const center = avgPrice;
     return {
-      yMin: Math.floor((min - padding) * 100) / 100,
-      yMax: Math.ceil((max + padding) * 100) / 100,
+      yMin: Math.floor((center - halfPadding) * 100) / 100,
+      yMax: Math.ceil((center + halfPadding) * 100) / 100,
     };
-  }, [data]);
+  }, [data, range]);
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -98,8 +105,7 @@ export function PriceChart({ data, height = 300, range = "all" }: PriceChartProp
           labelFormatter={(_, payload) => {
             const item = payload?.[0]?.payload;
             if (item?.date) {
-              const d = new Date(item.date);
-              return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+              return formatChartDate(item.date, { fullYear: true });
             }
             return item?.label ?? "";
           }}

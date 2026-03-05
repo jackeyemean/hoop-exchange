@@ -344,7 +344,8 @@ def compute_prices_for_single_date(
         prev_price = prev_prices.get(ps_id)
         change_pct = None
         if prev_price and prev_price > 0:
-            change_pct = round((price - prev_price) / prev_price, 4)
+            # Use raw_score (not rounded price) so small changes are visible when rounding makes price == prev_price
+            change_pct = round((raw_score - prev_price) / prev_price, 4)
 
         results.append({
             "player_season_id": ps_id,

@@ -108,9 +108,9 @@ func (r *IndexRepository) GetConstituentsWithDetails(ctx context.Context, indexI
 		        ps.tier::text,
 		        ps.float_shares,
 		        COALESCE(ph.price, 0),
-		        CASE WHEN prev.price IS NOT NULL AND prev.price > 0
-		             THEN ROUND((ph.price - prev.price) / prev.price, 4)
-		             ELSE ph.change_pct
+		        CASE WHEN prev_day.price IS NOT NULL AND prev_day.price > 0
+		             THEN ROUND((curr_day.price - prev_day.price) / prev_day.price, 6)
+		             ELSE NULL
 		        END,
 		        COALESCE(ph.market_cap, 0)
 		 FROM index_constituents ic
@@ -118,7 +118,7 @@ func (r *IndexRepository) GetConstituentsWithDetails(ctx context.Context, indexI
 		 JOIN players p ON p.id = ps.player_id
 		 LEFT JOIN teams t ON t.id = ps.team_id
 		 LEFT JOIN LATERAL (
-		     SELECT price, change_pct, market_cap
+		     SELECT price, market_cap
 		     FROM price_history
 		     WHERE player_season_id = ic.player_season_id
 		     ORDER BY trade_date DESC LIMIT 1
@@ -126,9 +126,15 @@ func (r *IndexRepository) GetConstituentsWithDetails(ctx context.Context, indexI
 		 LEFT JOIN LATERAL (
 		     SELECT price FROM price_history
 		     WHERE player_season_id = ic.player_season_id
-		       AND price IS DISTINCT FROM ph.price
-		     ORDER BY trade_date DESC LIMIT 1
-		 ) prev ON true
+		     ORDER BY trade_date DESC
+		     OFFSET 1 LIMIT 1
+		 ) curr_day ON true
+		 LEFT JOIN LATERAL (
+		     SELECT price FROM price_history
+		     WHERE player_season_id = ic.player_season_id
+		     ORDER BY trade_date DESC
+		     OFFSET 2 LIMIT 1
+		 ) prev_day ON true
 		 WHERE ic.index_id = $1
 		 ORDER BY ic.weight DESC`,
 		indexID,
@@ -158,13 +164,13 @@ func (r *IndexRepository) GetConstituentsWithDetails(ctx context.Context, indexI
 	return results, rows.Err()
 }
 
-func (r *IndexRepository) GetHistory(ctx context.Context, indexID int, limit int) ([]model.IndexHistory, error) {
+func (r *IndexRepository) GetHistory(ctx context.Context, indexID int, limit int, offset int) ([]model.IndexHistory, error) {
 	rows, err := r.Pool.Query(ctx,
 		`SELECT id, index_id, trade_date, level, prev_level, change_pct, created_at
 		 FROM index_history WHERE index_id = $1
 		 ORDER BY trade_date DESC
-		 LIMIT $2`,
-		indexID, limit,
+		 OFFSET $2 LIMIT $3`,
+		indexID, offset, limit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get index history: %w", err)
