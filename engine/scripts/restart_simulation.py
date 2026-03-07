@@ -75,9 +75,13 @@ def _backfill_season_with_uniform_shares(
 
 
 @click.command()
-def main():
+@click.option("--debug", is_flag=True, help="Enable debug logging for index rebalance (IPO, Toronto Raptors, user-held indexes)")
+def main(debug: bool):
     """Run full tier bootstrap simulation: 2 prior seasons (uniform shares) -> tier assignment -> current season."""
-    log.info("=== Restart Simulation ===")
+    if debug:
+        import os
+        os.environ["DEBUG_INDEXES"] = "1"
+    log.info("=== Restart Simulation ===" + (" [DEBUG]" if debug else ""))
 
     # Ensure we're run from engine/ so migrations path works
     engine_dir = Path(__file__).resolve().parent.parent
@@ -192,7 +196,7 @@ def main():
             )
             trade_dates = [row[0] for row in cur.fetchall()]
         for d in trade_dates:
-            rebalance_indexes(conn, season_id_2526, d)
+            rebalance_indexes(conn, season_id_2526, d, debug=debug)
         log.info("Initialized indexes for %d trade dates", len(trade_dates))
 
         log.info("=== Restart Simulation Complete ===")
