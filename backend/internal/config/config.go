@@ -30,7 +30,7 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		DatabaseURL: envOrDefault("DATABASE_URL", "postgres://nbaexchange:nbaexchange@localhost:5432/nbaexchange?sslmode=disable"),
-		APIPort:     envOrDefault("API_PORT", "8080"),
+		APIPort:     envOrDefault("API_PORT", envOrDefault("PORT", "8080")),
 		WSPort:         envOrDefault("WS_PORT", "8081"),
 		SupabaseJWTSecret: envOrDefault("SUPABASE_JWT_SECRET", ""),
 		SupabaseURL:       envOrDefault("SUPABASE_URL", ""),

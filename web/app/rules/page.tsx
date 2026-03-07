@@ -118,7 +118,7 @@ export default function RulesPage() {
           <li>Lottery (1–14) → Growth</li>
           <li>First round / early second (15–39) → Mid Cap</li>
           <li>Everyone else → Penny Stock</li>
-          <li>Rookies cannot be traded until they have played 20 games</li>
+          <li>Rookies and the Renaissance IPO Index unlock for trading when the first rookie hits 20 games</li>
         </ul>
       </section>
     </div>

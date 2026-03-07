@@ -23,31 +23,53 @@ func NewTradingService(pool *pgxpool.Pool) *TradingService {
 
 const rookieMinGames = 20
 
+// isRookieClassUnlocked returns true if any rookie in the season has >= rookieMinGames.
+// When true, all rookies and the IPO index become tradeable at once.
+func (s *TradingService) isRookieClassUnlocked(ctx context.Context, seasonID int) (bool, error) {
+	var anyRookieWith20 int
+	err := s.Pool.QueryRow(ctx,
+		`SELECT 1 FROM (
+			SELECT ps.id, COUNT(gs.id) AS games
+			FROM player_seasons ps
+			LEFT JOIN game_stats gs ON gs.player_season_id = ps.id
+			WHERE ps.season_id = $1 AND COALESCE(ps.is_rookie, false)
+			GROUP BY ps.id
+			HAVING COUNT(gs.id) >= $2
+			LIMIT 1
+		) x`,
+		seasonID, rookieMinGames,
+	).Scan(&anyRookieWith20)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (s *TradingService) PlaceOrder(ctx context.Context, userID uuid.UUID, playerSeasonID int, side model.OrderSide, quantity int) (*model.Trade, error) {
 	if quantity <= 0 {
 		return nil, errors.New("quantity must be positive")
 	}
 
-	// Rookie restriction: rookies can only be traded after 20 games played
+	// Rookie restriction: rookies unlock as a class when the first rookie hits 20 games.
 	var isRookie bool
+	var seasonID int
 	err := s.Pool.QueryRow(ctx,
-		`SELECT COALESCE(is_rookie, false) FROM player_seasons WHERE id = $1`,
+		`SELECT COALESCE(is_rookie, false), season_id FROM player_seasons WHERE id = $1`,
 		playerSeasonID,
-	).Scan(&isRookie)
+	).Scan(&isRookie, &seasonID)
 	if err != nil {
 		return nil, fmt.Errorf("get player season: %w", err)
 	}
 	if isRookie {
-		var gamesPlayed int
-		err = s.Pool.QueryRow(ctx,
-			`SELECT COUNT(*) FROM game_stats WHERE player_season_id = $1`,
-			playerSeasonID,
-		).Scan(&gamesPlayed)
+		unlocked, err := s.isRookieClassUnlocked(ctx, seasonID)
 		if err != nil {
-			return nil, fmt.Errorf("count games: %w", err)
+			return nil, fmt.Errorf("check rookie class: %w", err)
 		}
-		if gamesPlayed < rookieMinGames {
-			return nil, fmt.Errorf("rookies cannot be traded until they have played %d games (this player has %d)", rookieMinGames, gamesPlayed)
+		if !unlocked {
+			return nil, fmt.Errorf("rookies cannot be traded until the first rookie in the draft class has played %d games", rookieMinGames)
 		}
 	}
 
@@ -202,6 +224,27 @@ func (s *TradingService) PlaceOrder(ctx context.Context, userID uuid.UUID, playe
 func (s *TradingService) PlaceIndexOrder(ctx context.Context, userID uuid.UUID, indexID int, side model.OrderSide, quantity int) (*model.Trade, error) {
 	if quantity <= 0 {
 		return nil, errors.New("quantity must be positive")
+	}
+
+	// IPO index: tradeable only when rookie class is unlocked (first rookie hits 20 games).
+	var indexType string
+	err := s.Pool.QueryRow(ctx, `SELECT index_type FROM indexes WHERE id = $1`, indexID).Scan(&indexType)
+	if err != nil {
+		return nil, fmt.Errorf("get index: %w", err)
+	}
+	if indexType == "ipo" {
+		var seasonID int
+		err = s.Pool.QueryRow(ctx, `SELECT id FROM seasons ORDER BY start_date DESC LIMIT 1`).Scan(&seasonID)
+		if err != nil {
+			return nil, fmt.Errorf("get active season: %w", err)
+		}
+		unlocked, err := s.isRookieClassUnlocked(ctx, seasonID)
+		if err != nil {
+			return nil, fmt.Errorf("check rookie class: %w", err)
+		}
+		if !unlocked {
+			return nil, fmt.Errorf("the Renaissance IPO Index cannot be traded until the first rookie has played %d games", rookieMinGames)
+		}
 	}
 
 	tx, err := s.Pool.BeginTx(ctx, pgx.TxOptions{})

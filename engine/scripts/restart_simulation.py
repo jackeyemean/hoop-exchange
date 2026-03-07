@@ -184,6 +184,21 @@ def main(debug: bool):
         # --- Phase 5: Initialize indexes ---
         log.info("--- Phase 5: Initialize indexes for 2025-26 ---")
         setup_default_indexes(conn, season_id_2526)
+        # Clear index_history for current season so we don't compound on corrupted data.
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM index_history WHERE trade_date >= %s",
+                (cfg_2526["start"],),
+            )
+            # IPO constituents change each season (new rookies); reset to 1000 by clearing
+            # all IPO history so prev_level is empty on first 2025-26 date.
+            cur.execute(
+                """
+                DELETE FROM index_history
+                WHERE index_id IN (SELECT id FROM indexes WHERE index_type = 'ipo')
+                """,
+            )
+        conn.commit()
         with conn.cursor() as cur:
             cur.execute(
                 """

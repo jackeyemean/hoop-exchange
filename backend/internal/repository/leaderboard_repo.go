@@ -47,7 +47,7 @@ func (r *LeaderboardRepository) GetByDate(ctx context.Context, date time.Time, l
 	return results, rows.Err()
 }
 
-// GetLive computes leaderboard from current positions and wallets (no snapshots needed)
+// GetLive computes leaderboard from current positions (player + index) and wallets (no snapshots needed)
 func (r *LeaderboardRepository) GetLive(ctx context.Context, limit int) ([]model.LeaderboardSnapshot, error) {
 	rows, err := r.Pool.Query(ctx,
 		`WITH pos_values AS (
@@ -61,11 +61,27 @@ func (r *LeaderboardRepository) GetLive(ctx context.Context, limit int) ([]model
 		     ) ph ON true
 		     WHERE pos.quantity > 0
 		 ),
+		 index_pos_values AS (
+		     SELECT ip.user_id,
+		            ip.quantity * COALESCE(ih.level, 0) as value
+		     FROM index_positions ip
+		     LEFT JOIN LATERAL (
+		         SELECT level FROM index_history
+		         WHERE index_id = ip.index_id
+		         ORDER BY trade_date DESC LIMIT 1
+		     ) ih ON true
+		     WHERE ip.quantity > 0
+		 ),
+		 all_pos_values AS (
+		     SELECT user_id, value FROM pos_values
+		     UNION ALL
+		     SELECT user_id, value FROM index_pos_values
+		 ),
 		 user_totals AS (
 		     SELECT w.user_id, w.balance as cash_balance,
-		            COALESCE(SUM(pv.value), 0) as portfolio_value
+		            COALESCE(SUM(apv.value), 0) as portfolio_value
 		     FROM wallets w
-		     LEFT JOIN pos_values pv ON pv.user_id = w.user_id
+		     LEFT JOIN all_pos_values apv ON apv.user_id = w.user_id
 		     GROUP BY w.user_id, w.balance
 		 )
 		 SELECT u.id, u.username, ut.cash_balance, ut.portfolio_value,

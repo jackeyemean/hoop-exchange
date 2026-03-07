@@ -1,7 +1,10 @@
 import logging
+import os
 from datetime import date
 
 log = logging.getLogger(__name__)
+
+DEBUG_INDEXES = os.environ.get("DEBUG_INDEXES", "").lower() == "1"
 
 POSITION_GROUPS = {
     "Guards": ["Guard", "G", "PG", "SG", "G-F"],
@@ -98,14 +101,29 @@ def _get_rookie_external_ids(conn, season_id: int) -> set[str]:
         return set()
 
 
-def rebalance_indexes(conn, season_id: int, trade_date: date):
+def rebalance_indexes(conn, season_id: int, trade_date: date, debug: bool = False):
+    debug = debug or DEBUG_INDEXES
     log.info("Rebalancing indexes for season %d on %s", season_id, trade_date)
+
+    # Debug: which indexes have user positions (index_positions)
+    indexes_with_users = set()
+    if debug:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT DISTINCT index_id FROM index_positions WHERE quantity > 0"
+                )
+                indexes_with_users = {row[0] for row in cur.fetchall()}
+            log.info("[DEBUG] Indexes with user positions: %s", indexes_with_users)
+        except Exception as e:
+            log.warning("[DEBUG] Could not query index_positions: %s", e)
 
     with conn.cursor() as cur:
         cur.execute(
             """
             SELECT ph.player_season_id, ph.price, ph.market_cap, ph.change_pct,
-                   ps.team_id, p.position, ps.tier::text, p.external_id
+                   ps.team_id, p.position, ps.tier::text, p.external_id,
+                   COALESCE(ps.is_rookie, false)
             FROM price_history ph
             JOIN player_seasons ps ON ph.player_season_id = ps.id
             JOIN players p ON ps.player_id = p.id
@@ -120,32 +138,66 @@ def rebalance_indexes(conn, season_id: int, trade_date: date):
         log.warning("No price data for %s, skipping rebalance", trade_date)
         return
 
+    # Games played per player as of trade_date (for rookie exclusion)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT gs.player_season_id, COUNT(*)::int
+            FROM game_stats gs
+            JOIN player_seasons ps ON gs.player_season_id = ps.id
+            WHERE ps.season_id = %s AND gs.game_date <= %s
+            GROUP BY gs.player_season_id
+            """,
+            (season_id, trade_date),
+        )
+        games_played = {row[0]: row[1] for row in cur.fetchall()}
+
     all_prices = {}
     for row in price_rows:
-        all_prices[row[0]] = {
+        ps_id = row[0]
+        all_prices[ps_id] = {
             "price": float(row[1]), "market_cap": float(row[2]),
             "change_pct": float(row[3]) if row[3] else 0.0,
             "team_id": row[4], "position": row[5] or "", "tier": row[6] or "",
             "external_id": str(row[7]) if row[7] else "",
+            "is_rookie": row[8],
+            "games_played": games_played.get(ps_id, 0),
         }
 
     rookie_external_ids = _get_rookie_external_ids(conn, season_id)
+
+    # Season start for IPO reset: when prev comes from a different season, IPO starts at 1000.
+    season_start = None
+    with conn.cursor() as cur:
+        cur.execute("SELECT start_date FROM seasons WHERE id = %s", (season_id,))
+        row = cur.fetchone()
+        if row and row[0]:
+            d = row[0]
+            season_start = d.date() if hasattr(d, "date") else d
 
     with conn.cursor() as cur:
         cur.execute("SELECT id, name, index_type, team_id FROM indexes")
         indexes = cur.fetchall()
 
+    # Per-index prev level: use each index's most recent level before trade_date.
+    # Previously we used a global "previous date" - if an index was skipped that day
+    # (e.g. IPO with no rookies, team with no constituents), we'd fall back to 1000.0
+    # and cause a huge spike. Now we use the last level for that index specifically.
     prev_levels = {}
+    prev_dates = {}
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT index_id, level FROM index_history
-            WHERE trade_date = (SELECT MAX(trade_date) FROM index_history WHERE trade_date < %s)
+            SELECT DISTINCT ON (index_id) index_id, level, trade_date
+            FROM index_history
+            WHERE trade_date < %s
+            ORDER BY index_id, trade_date DESC
             """,
             (trade_date,),
         )
         for row in cur.fetchall():
             prev_levels[row[0]] = float(row[1])
+            prev_dates[row[0]] = row[2]
 
     index_results = []
 
@@ -177,7 +229,40 @@ def rebalance_indexes(conn, season_id: int, trade_date: date):
         )
 
         prev_level = prev_levels.get(idx_id, 1000.0)
+        # IPO index: reset to 1000 when prev comes from a different season (update_market edge case).
+        if idx_type == "ipo" and season_start and prev_dates.get(idx_id) is not None:
+            prev_d = prev_dates[idx_id]
+            if hasattr(prev_d, "date"):
+                prev_d = prev_d.date()
+            if prev_d < season_start:
+                prev_level = 1000.0
+        used_default_prev = idx_id not in prev_levels
         level = prev_level * (1.0 + weighted_return)
+
+        if debug and (
+            idx_name in ("Renaissance IPO Index", "Toronto Raptors Index")
+            or idx_id in indexes_with_users
+            or used_default_prev
+            or abs(weighted_return) > 0.15
+        ):
+            top_changes = sorted(
+                [(ps_id, capped[ps_id], all_prices[ps_id]["change_pct"]) for ps_id in capped],
+                key=lambda x: abs(x[2]) if x[2] else 0,
+                reverse=True,
+            )[:5]
+            log.info(
+                "[DEBUG] %s (id=%s) | prev=%.2f (default=%s) | weighted_ret=%.4f | "
+                "n_const=%d | users_hold=%s | level=%.2f | top_changes=%s",
+                idx_name,
+                idx_id,
+                prev_level,
+                used_default_prev,
+                weighted_return,
+                len(constituents),
+                idx_id in indexes_with_users,
+                level,
+                [(round(w, 4), f"{cp:.2%}" if cp is not None else "None") for _, w, cp in top_changes],
+            )
 
         # Cap level to prevent NUMERIC(12,4) overflow (max < 10^8)
         MAX_LEVEL = 99_999_999.99
@@ -213,6 +298,10 @@ SP500_CAP = 500
 SP100_CAP = 100
 DJIA_CAP = 30
 
+# Rookie threshold: exclude from indexes until they've played this many games (aligns with trading restriction).
+# 20 > RECENT_WINDOW (15) so rookies have full recent-form data before entering indexes.
+ROOKIE_MIN_GAMES = 20
+
 
 def _select_constituents(all_prices: dict, idx_type: str, team_id: int | None,
                          index_name: str = "", rookie_external_ids: set[str] | None = None) -> list[int]:
@@ -232,13 +321,22 @@ def _select_constituents(all_prices: dict, idx_type: str, team_id: int | None,
         return [ps_id for ps_id, info in all_prices.items() if info.get("tier") == "magnificent_7"]
     if idx_type == "tier_bluechip":
         return [ps_id for ps_id, info in all_prices.items() if info.get("tier") == "blue_chip"]
-    # IPO index: all rookies (drafted in current season's draft year)
+    # IPO index: rookies with >= ROOKIE_MIN_GAMES (aligns with trading restriction)
     if idx_type == "ipo":
         rookies = rookie_external_ids or set()
-        return [ps_id for ps_id, info in all_prices.items() if info.get("external_id", "") in rookies]
+        return [
+            ps_id for ps_id, info in all_prices.items()
+            if info.get("external_id", "") in rookies
+            and info.get("games_played", 0) >= ROOKIE_MIN_GAMES
+        ]
 
     if idx_type == "team" and team_id is not None:
-        return [ps_id for ps_id, info in all_prices.items() if info["team_id"] == team_id]
+        # Exclude rookies with < ROOKIE_MIN_GAMES from team indexes
+        return [
+            ps_id for ps_id, info in all_prices.items()
+            if info["team_id"] == team_id
+            and (not info.get("is_rookie", False) or info.get("games_played", 0) >= ROOKIE_MIN_GAMES)
+        ]
 
     if idx_type == "position":
         target_group = None
