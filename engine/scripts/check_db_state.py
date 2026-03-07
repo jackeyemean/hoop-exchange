@@ -49,7 +49,7 @@ def main():
             cur.execute("SELECT 1 FROM price_history WHERE trade_date = %s LIMIT 1", (today,))
             has_today = cur.fetchone() is not None
             print(f"\nHas price_history for {today}: {has_today}")
-            if not has_today and today.weekday() < 5:
+            if not has_today:
                 print("  -> Run update_market.py to create today's prices (incorporates yesterday's games)")
     finally:
         conn.close()

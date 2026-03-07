@@ -69,10 +69,11 @@ def apply_tiers_to_current_season(
     for ps_id, ext_id in rows:
         tier = tier_map.get(ext_id) or rookie_tier_map.get(ext_id, TIER_DEFAULT)
         float_shares = FLOAT_SHARES[tier]
+        is_rookie = ext_id in rookie_tier_map
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE player_seasons SET tier = %s, float_shares = %s WHERE id = %s",
-                (tier, float_shares, ps_id),
+                "UPDATE player_seasons SET tier = %s, float_shares = %s, is_rookie = %s WHERE id = %s",
+                (tier, float_shares, is_rookie, ps_id),
             )
     conn.commit()
     log.info("Applied tiers to %d players for current season", len(rows))
@@ -181,10 +182,11 @@ def apply_year0_tiers_from_prices(conn, season_id: int, season_label: str):
     for ps_id, ext_id, _ in rows:
         tier = tier_map.get(ext_id, TIER_DEFAULT)
         float_shares = FLOAT_SHARES[tier]
+        is_rookie = ext_id in rookie_tier_map
         with conn.cursor() as cur:
             cur.execute(
-                "UPDATE player_seasons SET tier = %s, float_shares = %s WHERE id = %s",
-                (tier, float_shares, ps_id),
+                "UPDATE player_seasons SET tier = %s, float_shares = %s, is_rookie = %s WHERE id = %s",
+                (tier, float_shares, is_rookie, ps_id),
             )
     conn.commit()
     log.info("Applied Year 0 tiers: %d manual/rookie preserved, %d price-ranked",

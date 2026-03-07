@@ -1,17 +1,16 @@
 """
 Update Market: Daily price update. Run at market open to update prices from prior games.
 
-Flow:
-  1. Ingest game stats for yesterday (or Fri/Sat/Sun on Monday)
-  2. Sync standings
-  3. Compute prices for today (same methodology as backfill / restart_simulation)
-  4. Write to price_history
-  5. Rebalance indexes
+Uses same methodology as restart_simulation:
+  1. sync_teams, sync_game_logs (LeagueGameLog bulk API), sync_standings
+  2. Compute prices for today (compute_prices_for_single_date - same formula as compute_historical_prices)
+  3. Write to price_history
+  4. Rebalance indexes
 
 Usage:
     python scripts/update_market.py --season 2025-26
 
-Schedule: Run daily at 8:00 AM ET (e.g. via cron or systemd timer).
+Schedule: Run daily at 6:00 AM ET (e.g. via GitHub Actions, cron, or systemd timer).
 Run from engine/ directory.
 """
 
@@ -30,10 +29,13 @@ from config import get_db_connection
 from db.prices import get_prev_prices, insert_price_history
 from db.seasons import get_season_by_label
 from formulas.compute import compute_prices_for_single_date
-from ingestion.game_stats import sync_game_stats_for_date
-from ingestion.nba import fetch_prior_season_averages, sync_standings
+from ingestion.nba import (
+    fetch_prior_season_averages,
+    sync_game_logs,
+    sync_standings,
+    sync_teams,
+)
 from indexes.calculator import rebalance_indexes
-from utils.dates import game_dates_to_ingest
 
 logging.basicConfig(
     level=logging.INFO,
@@ -63,14 +65,9 @@ def main(season: str):
         season_id = s["id"]
         trade_date = date.today()
 
-        if trade_date.weekday() >= 5:
-            log.info("Weekend - no trading. Skipping.")
-            return
-
-        game_dates = game_dates_to_ingest(trade_date)
-        for d in game_dates:
-            sync_game_stats_for_date(conn, season, d.strftime("%Y-%m-%d"))
-
+        sync_teams(conn)
+        log.info("Syncing game logs (same as restart_simulation)...")
+        sync_game_logs(conn, season_id, season)
         log.info("Syncing standings...")
         sync_standings(conn, season_id, season)
 

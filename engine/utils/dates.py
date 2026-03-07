@@ -4,12 +4,12 @@ from datetime import date, timedelta
 
 
 def trading_days_in_range(start: date, end: date) -> list[date]:
-    """Return list of weekdays (Mon–Fri) from start through end inclusive."""
+    """Return list of all calendar days from start through end inclusive.
+    Market is open every day: weekdays 6am-6pm ET, weekends 6am-1pm ET."""
     result = []
     current = start
     while current <= end:
-        if current.weekday() < 5:
-            result.append(current)
+        result.append(current)
         current += timedelta(days=1)
     return result
 

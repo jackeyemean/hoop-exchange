@@ -4,7 +4,7 @@ Uses formulas.raw_perf, formulas.multipliers.
 """
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 from psycopg2.extras import execute_values
 
@@ -109,13 +109,16 @@ def compute_historical_prices(
 
     for td_idx, trade_date in enumerate(trade_days):
         rows_to_insert = []
-        team_win_pcts = get_team_win_pcts_as_of_date(conn, season_id, trade_date)
+        # Use games *before* trade_date so each day's price = "as of market open" (previous day's close).
+        # This makes daily change = impact of previous day's games (works for both restart and update_market).
+        games_cutoff = trade_date - timedelta(days=1) if trade_date else trade_date
+        team_win_pcts = get_team_win_pcts_as_of_date(conn, season_id, games_cutoff)
         all_win_pcts = list(team_win_pcts.values()) if team_win_pcts else []
 
         day_data = []
         for ps_id, player_id, team_id, float_shares, status, birthdate, ext_id in all_players:
             stats = game_stats_by_player.get(ps_id, [])
-            games_before = [s for s in stats if s["game_date"] <= trade_date]
+            games_before = [s for s in stats if s["game_date"] <= games_cutoff]
             n_games = len(games_before)
 
             prior_raw = prior_avgs.get(ext_id, None)
@@ -183,7 +186,8 @@ def compute_historical_prices(
             prev_price = prev_prices.get(ps_id)
             change_pct = None
             if prev_price and prev_price > 0:
-                change_pct = round((price - prev_price) / prev_price, 4)
+                # Use raw_score (not rounded price) so small changes are visible when rounding makes price == prev_price
+                change_pct = round((raw_score - prev_price) / prev_price, 4)
 
             rows_to_insert.append((
                 ps_id, trade_date, round(float(perf_score), 4), float(age_mult),
@@ -269,13 +273,16 @@ def compute_prices_for_single_date(
                 "blk": float(row[13]), "tov": float(row[14]),
             })
 
-    team_win_pcts = get_team_win_pcts_as_of_date(conn, season_id, trade_date)
+    # Use games *before* trade_date so price = "as of market open" (previous day's close).
+    # Daily change = impact of previous day's games.
+    games_cutoff = trade_date - timedelta(days=1) if trade_date else trade_date
+    team_win_pcts = get_team_win_pcts_as_of_date(conn, season_id, games_cutoff)
     all_win_pcts = list(team_win_pcts.values()) if team_win_pcts else []
 
     day_data = []
     for ps_id, player_id, team_id, float_shares, status, birthdate, ext_id in all_players:
         stats = game_stats_by_player.get(ps_id, [])
-        games_before = [s for s in stats if s["game_date"] <= trade_date]
+        games_before = [s for s in stats if s["game_date"] <= games_cutoff]
         n_games = len(games_before)
 
         prior_raw = prior_avgs.get(ext_id, None)
