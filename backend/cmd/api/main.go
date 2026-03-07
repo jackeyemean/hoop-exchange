@@ -97,6 +97,7 @@ func main() {
 					cfg.MarketTimezone,
 					cfg.MarketOpenHour, cfg.MarketOpenMinute,
 					cfg.MarketCloseHour, cfg.MarketCloseMinute,
+					cfg.MarketCloseHourWeekend,
 				),
 				tradingH.PlaceOrder,
 			)

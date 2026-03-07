@@ -42,7 +42,7 @@ engine/
 **Run (from `engine/`):**
 - `python scripts/restart_simulation.py` — bootstrap/reset market
 - `python scripts/backfill.py --season 2025-26` — full backfill for a season
-- `python scripts/update_market.py --season 2025-26` — daily at market open
+- `python scripts/update_market.py --season 2025-26` — daily at 6:00 AM ET (market open)
 
 ---
 

@@ -14,11 +14,12 @@ type Config struct {
 	SupabaseJWTSecret string // Legacy HS256 secret (optional if using JWKS)
 	SupabaseURL       string // e.g. https://xxx.supabase.co - for JWKS (RS256) verification
 
-	MarketOpenHour    int
-	MarketOpenMinute  int
-	MarketCloseHour   int
-	MarketCloseMinute int
-	MarketTimezone    string
+	MarketOpenHour         int
+	MarketOpenMinute       int
+	MarketCloseHour        int
+	MarketCloseMinute      int
+	MarketCloseHourWeekend int // 1pm on Sat/Sun
+	MarketTimezone         string
 
 	StartingBalance float64
 	ScalingFactor   float64
@@ -50,6 +51,10 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	cfg.MarketCloseMinute, err = envIntOrDefault("MARKET_CLOSE_MINUTE", 0)
+	if err != nil {
+		return nil, err
+	}
+	cfg.MarketCloseHourWeekend, err = envIntOrDefault("MARKET_CLOSE_HOUR_WEEKEND", 13)
 	if err != nil {
 		return nil, err
 	}

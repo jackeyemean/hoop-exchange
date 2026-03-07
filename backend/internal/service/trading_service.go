@@ -21,9 +21,34 @@ func NewTradingService(pool *pgxpool.Pool) *TradingService {
 	return &TradingService{Pool: pool}
 }
 
+const rookieMinGames = 20
+
 func (s *TradingService) PlaceOrder(ctx context.Context, userID uuid.UUID, playerSeasonID int, side model.OrderSide, quantity int) (*model.Trade, error) {
 	if quantity <= 0 {
 		return nil, errors.New("quantity must be positive")
+	}
+
+	// Rookie restriction: rookies can only be traded after 20 games played
+	var isRookie bool
+	err := s.Pool.QueryRow(ctx,
+		`SELECT COALESCE(is_rookie, false) FROM player_seasons WHERE id = $1`,
+		playerSeasonID,
+	).Scan(&isRookie)
+	if err != nil {
+		return nil, fmt.Errorf("get player season: %w", err)
+	}
+	if isRookie {
+		var gamesPlayed int
+		err = s.Pool.QueryRow(ctx,
+			`SELECT COUNT(*) FROM game_stats WHERE player_season_id = $1`,
+			playerSeasonID,
+		).Scan(&gamesPlayed)
+		if err != nil {
+			return nil, fmt.Errorf("count games: %w", err)
+		}
+		if gamesPlayed < rookieMinGames {
+			return nil, fmt.Errorf("rookies cannot be traded until they have played %d games (this player has %d)", rookieMinGames, gamesPlayed)
+		}
 	}
 
 	tx, err := s.Pool.BeginTx(ctx, pgx.TxOptions{})

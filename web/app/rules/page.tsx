@@ -9,9 +9,9 @@ export default function RulesPage() {
       <section className="mb-10">
         <h2 className="mb-3 text-base font-semibold">Market hours</h2>
         <ul className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
-          <li>6:00 AM – 6:00 PM Eastern, weekdays only</li>
-          <li>Prices update once at market open, using the previous day&apos;s games</li>
-          <li>Weekend games roll into Monday&apos;s price</li>
+          <li>Weekdays: 6:00 AM – 6:00 PM Eastern</li>
+          <li>Weekends: 6:00 AM – 1:00 PM Eastern</li>
+          <li>Prices update daily at 6:00 AM ET, using the previous day&apos;s games</li>
           <li>$100,000 starting cash. Market orders only (instant fill)</li>
         </ul>
       </section>
@@ -118,6 +118,7 @@ export default function RulesPage() {
           <li>Lottery (1–14) → Growth</li>
           <li>First round / early second (15–39) → Mid Cap</li>
           <li>Everyone else → Penny Stock</li>
+          <li>Rookies cannot be traded until they have played 20 games</li>
         </ul>
       </section>
     </div>

@@ -57,7 +57,7 @@ export default function DiscoverPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Discover</h1>
         <p className="mt-1 text-sm text-neutral-500">
-          Browse all player stocks. Prices update at market open.
+          Browse all player stocks. Prices update daily at 6:00 AM ET.
         </p>
       </div>
 

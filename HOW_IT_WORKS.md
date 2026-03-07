@@ -277,14 +277,16 @@ To match the market cap of a player in the tier above you, you need this much hi
 
 ## Trading Days and Game Inclusion
 
-- **Trading days:** Weekdays only (Monday–Friday). Prices update once per trading day.
-- **Games included:** For a given trading day, we include **all games** with `game_date ≤ trade_date`. Weekend games are included — they roll into the next weekday's price.
+- **Trading days:** Every day. Prices update once per day at 6:00 AM ET.
+- **Games included:** For a given trading day, we include **all games** with `game_date ≤ trade_date`.
 
 ---
 
 ## Market Hours
 
-Prices update at **market open** each weekday. Trading hours: 6:00 AM – 6:00 PM ET. No trading during live games.
+Prices update at **6:00 AM ET** daily. Trading hours:
+- **Weekdays:** 6:00 AM – 6:00 PM ET
+- **Weekends:** 6:00 AM – 1:00 PM ET
 
 ---
 

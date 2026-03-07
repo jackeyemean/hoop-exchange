@@ -25,7 +25,7 @@ migrations/ → PostgreSQL schema
 
 ## Pricing Formula
 
-Prices update at market open (6:00 AM ET) based on the previous day's games.
+Prices update daily at 6:00 AM ET based on the previous day's games.
 
 ```
 Performance Score = (PTS×2.0) + (AST×1.5) + (REB×1.2) + (STL×2.0) + (BLK×1.5) - (TOV×1.8) + (TS%×20)
@@ -37,7 +37,7 @@ Market Cap  = Price × FloatShares
 
 ## Market Rules
 
-- **Hours:** 6:00 AM – 6:00 PM ET, weekdays only
+- **Hours:** Weekdays 6:00 AM – 6:00 PM ET; weekends 6:00 AM – 1:00 PM ET
 - **Orders:** Market orders (instant fill at day's price)
 - **Currency:** Virtual only ($100,000 starting balance)
 - **Protections:** Rate limits (100 req/min), abuse guards (30 orders/min per user)
@@ -68,6 +68,7 @@ psql $DATABASE_URL -f migrations/005_renaissance_ipo_index.up.sql
 psql $DATABASE_URL -f migrations/006_oauth_users.up.sql
 psql $DATABASE_URL -f migrations/007_user_username_seq.up.sql
 psql $DATABASE_URL -f migrations/008_index_trading.up.sql
+psql $DATABASE_URL -f migrations/009_rookie_trading_restriction.up.sql
 ```
 
 ### 3. Set up Supabase Auth (Google)
@@ -153,7 +154,7 @@ python main.py schedule --season 2025-26      # Daily scheduler (8am ET)
 
 ## Market Automation
 
-The engine runs a daily job at **8:00 AM ET** that:
+The engine runs a daily job at **6:00 AM ET** that:
 
 1. Ingests game stats (yesterday, or Fri–Sun if Monday)
 2. Syncs standings
@@ -192,9 +193,13 @@ python main.py price --season "$SEASON"
 python main.py rebalance --season "$SEASON"
 ```
 
-Then add to crontab (8:00 AM ET weekdays): `0 8 * * 1-5 /path/to/run_daily.sh`
+Then add to crontab (6:00 AM ET daily): `0 6 * * * /path/to/run_daily.sh`
 
 **Simpler:** Run `python main.py schedule --season 2025-26` as a daemon (Option 1) instead of cron.
+
+### Option 4: GitHub Actions
+
+A workflow at `.github/workflows/update_market.yml` runs `update_market.py` daily at 6:00 AM ET. Add `DATABASE_URL` as a repository secret.
 
 ### Option 3: systemd (Linux)
 

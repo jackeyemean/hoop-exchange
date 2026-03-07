@@ -105,7 +105,7 @@ backend/
 | **RateLimiter** | 100 req/min global |
 | **AbuseGuard** | 30 orders/min per user, max 500k per order |
 | **AuthRequired** | JWT validation for protected routes |
-| **MarketOpen** | 6:00 AM–6:00 PM ET (configurable) |
+| **MarketOpen** | Weekdays 6:00 AM–6:00 PM ET; weekends 6:00 AM–1:00 PM ET (configurable) |
 
 ---
 
@@ -126,8 +126,9 @@ backend/
 | `API_PORT` | REST API port (default 8080) |
 | `STARTING_BALANCE` | New user starting balance |
 | `MARKET_TIMEZONE` | Market timezone (e.g. America/New_York) |
-| `MARKET_OPEN_HOUR`, `MARKET_OPEN_MINUTE` | Market open time |
-| `MARKET_CLOSE_HOUR`, `MARKET_CLOSE_MINUTE` | Market close time |
+| `MARKET_OPEN_HOUR`, `MARKET_OPEN_MINUTE` | Market open time (6:00) |
+| `MARKET_CLOSE_HOUR`, `MARKET_CLOSE_MINUTE` | Market close time weekdays (18:00) |
+| `MARKET_CLOSE_HOUR_WEEKEND` | Market close time Sat/Sun (13:00) |
 
 ---
 

@@ -94,12 +94,13 @@ func (r *PlayerRepository) GetPlayerSeasonByID(ctx context.Context, id int) (*mo
 }
 
 func (r *PlayerRepository) ListActiveWithPrices(ctx context.Context, seasonID int) ([]PlayerWithPrice, error) {
+	// change_pct: (today - yesterday) / yesterday. When equal (no games), correctly shows 0%.
 	rows, err := r.Pool.Query(ctx,
 		`SELECT ps.id, p.first_name, p.last_name, COALESCE(p.position, ''), t.abbreviation,
 		        ps.tier::text, ps.float_shares, ps.status::text,
 		        ph.price,
-		        CASE WHEN prev_day.price IS NOT NULL AND prev_day.price > 0
-		             THEN ROUND((curr_day.price - prev_day.price) / prev_day.price, 6)
+		        CASE WHEN prev_row.price IS NOT NULL AND prev_row.price > 0
+		             THEN ROUND((ph.price - prev_row.price)::numeric / prev_row.price, 6)
 		             ELSE NULL
 		        END AS change_pct,
 		        ph.market_cap
@@ -118,13 +119,7 @@ func (r *PlayerRepository) ListActiveWithPrices(ctx context.Context, seasonID in
 		     WHERE player_season_id = ps.id
 		     ORDER BY trade_date DESC
 		     OFFSET 1 LIMIT 1
-		 ) curr_day ON true
-		 LEFT JOIN LATERAL (
-		     SELECT price FROM price_history
-		     WHERE player_season_id = ps.id
-		     ORDER BY trade_date DESC
-		     OFFSET 2 LIMIT 1
-		 ) prev_day ON true
+		 ) prev_row ON true
 		 WHERE ps.season_id = $1 AND ps.status NOT IN ('delisted')
 		 ORDER BY ph.market_cap DESC NULLS LAST`,
 		seasonID,
