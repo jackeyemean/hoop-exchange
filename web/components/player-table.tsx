@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { formatCurrency, formatCompact, formatPct, pctColor } from "@/lib/utils";
+import { formatCurrency, formatCompact, formatCompactNumber, formatPct, pctColor } from "@/lib/utils";
 import { TierBadge } from "@/components/tier-badge";
 
 interface PlayerRow {
@@ -69,7 +69,7 @@ export function PlayerTable({ players }: { players: PlayerRow[] }) {
                   <TierBadge tier={p.tier} />
                 </td>
                 <td className="px-4 py-3 text-right font-mono text-neutral-600 dark:text-neutral-400">
-                  {formatCompact(p.floatShares)}
+                  {formatCompactNumber(p.floatShares)}
                 </td>
                 <td className="px-4 py-3 text-right font-mono">{formatCurrency(p.price)}</td>
                 <td className={`px-4 py-3 text-right font-mono ${pctColor(p.changePct)}`}>

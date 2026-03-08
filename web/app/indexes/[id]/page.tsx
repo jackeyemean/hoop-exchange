@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { PriceChart } from "@/components/price-chart";
 import { IndexTradePanel } from "@/components/index-trade-panel";
-import { formatCurrency, formatCompact, formatPct, pctColor } from "@/lib/utils";
+import { formatCurrency, formatCompact, formatCompactNumber, formatPct, pctColor } from "@/lib/utils";
 import Link from "next/link";
 
 type PriceRange = "all" | "season" | "month" | "week" | "day";
@@ -227,7 +227,7 @@ export default function IndexDetailPage() {
                   <TierBadge tier={c.tier || "penny_stock"} />
                 </td>
                 <td className="px-4 py-3 text-right font-mono text-neutral-600 dark:text-neutral-400">
-                  {formatCompact(c.floatShares ?? 0)}
+                  {formatCompactNumber(c.floatShares ?? 0)}
                 </td>
                 <td className="px-4 py-3 text-right font-mono text-neutral-600 dark:text-neutral-400">
                   {((c.weight ?? 0) * 100).toFixed(2)}%
