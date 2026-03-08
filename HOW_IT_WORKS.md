@@ -107,7 +107,7 @@ If Wemby is Mag 7 (12M float): market_cap = $77.62 × 12,000,000 = **~$931M**.
 | **Raw score** | ESPN-aligned weights give familiar fantasy-like values and reward efficiency (miss penalties) and defense (steals/blocks). |
 | **Blending** | 80/20 season vs last 15 games balances stability with hot/cold streaks. Prior-year blend for early season avoids noisy starts. |
 | **Power curve** | Exponent 2.5 makes small stat gains at the top matter more than at the bottom, matching how fans value stars. |
-| **Age multiplier** | Young elite players reach 1.5×; older low performers drop toward 0.7×. Prime (28–32) is neutral. |
+| **Age multiplier** | Young elite players reach 1.5×; older low performers drop toward 0.7×. Prime (30) is neutral. |
 | **Win%** | Linear 0.90×–1.15× by league rank; capped +15% / −10% so team context stays modest. |
 | **Injury** | Quadratic ramp down to 0.70× over 35 missed games models increasing uncertainty. |
 
