@@ -134,7 +134,7 @@ scripts/restart_simulation: same sync + compute for prior seasons (uniform share
              → assign tiers from ranking → simulate current season (tier shares)
              → indexes.calculator (setup_default_indexes, rebalance_indexes)
                     ↓
-scripts/update_market: sync_game_stats_for_date → sync_standings → compute_prices_for_single_date
+scripts/update_market: sync_incremental_game_stats (date-by-date) → sync_standings → compute_prices_for_single_date
              → db.prices.insert_price_history → rebalance_indexes
                     ↓
 PostgreSQL (price_history, index_history, etc.)

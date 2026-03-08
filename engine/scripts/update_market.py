@@ -1,8 +1,8 @@
 """
 Update Market: Daily price update. Run at market open to update prices from prior games.
 
-Uses same methodology as restart_simulation:
-  1. sync_teams, sync_game_logs (LeagueGameLog bulk API), sync_standings
+Uses incremental game sync (date-by-date) instead of bulk LeagueGameLog to avoid timeouts:
+  1. sync_teams, sync_incremental_game_stats (only new dates since last in DB), sync_standings
   2. Compute prices for today (compute_prices_for_single_date - same formula as compute_historical_prices)
   3. Write to price_history
   4. Rebalance indexes
@@ -29,9 +29,9 @@ from config import get_db_connection
 from db.prices import get_prev_prices, insert_price_history
 from db.seasons import get_season_by_label
 from formulas.compute import compute_prices_for_single_date
+from ingestion.game_stats import sync_incremental_game_stats
 from ingestion.nba import (
     fetch_prior_season_averages,
-    sync_game_logs,
     sync_standings,
     sync_teams,
 )
@@ -66,8 +66,8 @@ def main(season: str):
         trade_date = date.today()
 
         sync_teams(conn)
-        log.info("Syncing game logs (same as restart_simulation)...")
-        sync_game_logs(conn, season_id, season)
+        log.info("Syncing incremental game stats (new dates only)...")
+        sync_incremental_game_stats(conn, season_id, season)
         log.info("Syncing standings...")
         sync_standings(conn, season_id, season)
 

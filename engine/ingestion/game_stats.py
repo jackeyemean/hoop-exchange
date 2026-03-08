@@ -4,13 +4,12 @@ Uses ScoreboardV2 + BoxScoreTraditionalV2 for efficiency (only fetches that day'
 """
 
 import logging
-import time
-from datetime import datetime
+from datetime import date, timedelta
 
 from nba_api.stats.endpoints import BoxScoreTraditionalV2, ScoreboardV2
 
-from constants import REQUEST_DELAY
 from formulas.raw_perf import calculate_raw_perf
+from utils.api import safe_request
 
 log = logging.getLogger(__name__)
 
@@ -36,9 +35,8 @@ def sync_game_stats_for_date(conn, season_label: str, game_date: str) -> int:
             return 0
         season_id = row[0]
 
-    time.sleep(REQUEST_DELAY)
     try:
-        resp = ScoreboardV2(game_date=game_date, league_id="00")
+        resp = safe_request(ScoreboardV2, game_date=game_date, league_id="00")
         games_df = resp.get_data_frames()[0]
     except Exception as e:
         log.exception("Failed to fetch scoreboard for %s: %s", game_date, e)
@@ -53,8 +51,7 @@ def sync_game_stats_for_date(conn, season_label: str, game_date: str) -> int:
 
     for game_id in game_ids:
         try:
-            time.sleep(REQUEST_DELAY)
-            box = BoxScoreTraditionalV2(game_id=game_id)
+            box = safe_request(BoxScoreTraditionalV2, game_id=game_id)
             player_stats = box.get_data_frames()[0]
         except Exception:
             log.exception("Failed to fetch box score for game %s", game_id)
@@ -175,3 +172,57 @@ def sync_game_stats_for_date(conn, season_label: str, game_date: str) -> int:
     conn.commit()
     log.info("Synced %d game stat rows for %s", count, game_date)
     return count
+
+
+def sync_incremental_game_stats(conn, season_id: int, season_label: str, through_date: date | None = None) -> int:
+    """
+    Fetch only new game stats since the last date in DB. Uses date-by-date API calls
+    (ScoreboardV2 + BoxScoreTraditionalV2) instead of bulk LeagueGameLog — much smaller
+    payloads, avoids timeouts. Fetches from (last_game_date + 1) through through_date
+    (default: yesterday).
+    """
+    through_date = through_date or (date.today() - timedelta(days=1))
+
+    # Ensure wl column exists (for team win% in price formula)
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'game_stats' AND column_name = 'wl'"
+        )
+        if cur.fetchone() is None:
+            cur.execute("ALTER TABLE game_stats ADD COLUMN wl CHAR(1)")
+            conn.commit()
+            log.info("Added wl column to game_stats")
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT MAX(gs.game_date)::date
+            FROM game_stats gs
+            JOIN player_seasons ps ON gs.player_season_id = ps.id
+            WHERE ps.season_id = %s
+            """,
+            (season_id,),
+        )
+        row = cur.fetchone()
+        last_date = row[0] if row and row[0] else None
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT start_date FROM seasons WHERE id = %s", (season_id,))
+        row = cur.fetchone()
+        season_start = row[0].date() if row and row[0] and hasattr(row[0], "date") else date(2025, 10, 22)
+
+    start_date = (last_date + timedelta(days=1)) if last_date else season_start
+    if start_date > through_date:
+        log.info("No new game dates to sync (last=%s, through=%s)", last_date, through_date)
+        return 0
+
+    log.info("Syncing incremental game stats from %s through %s", start_date, through_date)
+    total = 0
+    d = start_date
+    while d <= through_date:
+        count = sync_game_stats_for_date(conn, season_label, d.isoformat())
+        total += count
+        d += timedelta(days=1)
+
+    log.info("Synced %d total game stat rows across %d dates", total, (through_date - start_date).days + 1)
+    return total
