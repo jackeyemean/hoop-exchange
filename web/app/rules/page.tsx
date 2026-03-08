@@ -26,7 +26,7 @@ export default function RulesPage() {
             </div>
             <div>
               <strong className="text-neutral-800 dark:text-neutral-200">Float shares</strong>
-              <p className="mt-0.5">Total shares per player. Fixed for the season by tier. Stars get more, role players fewer.</p>
+              <p className="mt-0.5">Total shares per player. Fixed for the season by tier based on last season's rankings. Stars get more, role players fewer.</p>
             </div>
             <div>
               <strong className="text-neutral-800 dark:text-neutral-200">Market cap</strong>
@@ -45,10 +45,10 @@ export default function RulesPage() {
               <strong className="text-neutral-800 dark:text-neutral-200">Recent form</strong> — Last 15 games = 20%, season avg = 80%. Hot streak up, cold streak down.
             </li>
             <li>
-              <strong className="text-neutral-800 dark:text-neutral-200">Age</strong> — Young stars boost (up to 2.0×). Older players tax (down to 0.5×).
+              <strong className="text-neutral-800 dark:text-neutral-200">Age</strong> — Young stars boost (up to 2.0×). Older players tax (down to 0.75×).
             </li>
             <li>
-              <strong className="text-neutral-800 dark:text-neutral-200">Team & injuries</strong> — Best teams +15%, worst −15%. Long absences can reduce a player's stock price by up to −30%.
+              <strong className="text-neutral-800 dark:text-neutral-200">Team & injuries</strong> — Best teams +15%, worst −10%. Long absences can reduce a player's stock price by up to −30%.
             </li>
           </ul>
         </section>
