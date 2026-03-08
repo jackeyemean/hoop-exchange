@@ -210,8 +210,29 @@ def main(debug: bool):
                 (season_id_2526,),
             )
             trade_dates = [row[0] for row in cur.fetchall()]
-        for d in trade_dates:
-            rebalance_indexes(conn, season_id_2526, d, debug=debug)
+        # Fetch rookie IDs once (same for all dates) instead of calling DraftHistory API 100+ times
+        from indexes.calculator import _get_rookie_external_ids
+        rookie_ids = _get_rookie_external_ids(conn, season_id_2526)
+        # Pre-fetch season_start and indexes once (same for all dates)
+        with conn.cursor() as cur:
+            cur.execute("SELECT start_date FROM seasons WHERE id = %s", (season_id_2526,))
+            row = cur.fetchone()
+            if row and row[0]:
+                d = row[0]
+                season_start_2526 = d.date() if hasattr(d, "date") else d
+            else:
+                season_start_2526 = None
+            cur.execute("SELECT id, name, index_type, team_id FROM indexes")
+            indexes_list = cur.fetchall()
+        # Batch commits: commit every 10 dates to reduce overhead
+        for i, d in enumerate(trade_dates):
+            rebalance_indexes(
+                conn, season_id_2526, d, debug=debug,
+                rookie_external_ids=rookie_ids,
+                season_start=season_start_2526,
+                indexes=indexes_list,
+                commit=(i + 1) % 10 == 0 or i == len(trade_dates) - 1,
+            )
         log.info("Initialized indexes for %d trade dates", len(trade_dates))
 
         log.info("=== Restart Simulation Complete ===")

@@ -126,7 +126,7 @@ def sync_players(conn, season_id: int, season_label: str, get_tier_fn):
     # Add rostered players with 0 games
     log.info("Fetching rostered players (including those with 0 games)...")
     try:
-        time.sleep(1)
+        time.sleep(0.3)
         resp2 = safe_request(CommonAllPlayers, is_only_current_season=1, season=season_label)
         roster_df = resp2.get_data_frames()[0]
         rostered_only = roster_df[roster_df["ROSTERSTATUS"] == 1]
@@ -212,9 +212,6 @@ def sync_players(conn, season_id: int, season_label: str, get_tier_fn):
 
 def sync_players_uniform(conn, season_id: int, season_label: str, uniform_float_shares: int):
     """Fetch all players for the season with uniform float_shares (for tier bootstrap simulation)."""
-    get_tier_fn = lambda _: TIER_DEFAULT
-    # We need to call sync_players but with uniform shares - the logic is different.
-    # sync_players uses get_tier_fn and FLOAT_SHARES[tier]. For uniform we need to override.
     from nba_api.stats.endpoints import (
         CommonAllPlayers,
         CommonPlayerInfo,
@@ -282,7 +279,7 @@ def sync_players_uniform(conn, season_id: int, season_label: str, uniform_float_
 
     log.info("Fetching rostered players (including those with 0 games)...")
     try:
-        time.sleep(1)
+        time.sleep(0.3)
         resp2 = safe_request(CommonAllPlayers, is_only_current_season=1, season=season_label)
         roster_df = resp2.get_data_frames()[0]
         rostered_only = roster_df[roster_df["ROSTERSTATUS"] == 1]
@@ -338,30 +335,30 @@ def sync_players_uniform(conn, season_id: int, season_label: str, uniform_float_
         )
         missing_bdays = cur.fetchall()
 
-    fetched = 0
-    for pid, ext_id in missing_bdays:
-        try:
-            resp = safe_request(CommonPlayerInfo, player_id=ext_id)
-            info_df = resp.get_data_frames()[0]
-            if not info_df.empty:
-                bday_str = info_df.iloc[0].get("BIRTHDATE", None)
-                position = info_df.iloc[0].get("POSITION", None)
-                if bday_str:
-                    bday = datetime.strptime(str(bday_str)[:10], "%Y-%m-%d").date()
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            "UPDATE players SET birthdate = %s, position = %s WHERE id = %s",
-                            (bday, position, pid),
-                        )
-            fetched += 1
-            if fetched % 50 == 0:
-                conn.commit()
-                log.info("  ...fetched %d / %d birthdates", fetched, len(missing_bdays))
-        except Exception:
-            log.debug("Failed to fetch info for player %s", ext_id)
+        fetched = 0
+        for pid, ext_id in missing_bdays:
+            try:
+                resp = safe_request(CommonPlayerInfo, player_id=ext_id)
+                info_df = resp.get_data_frames()[0]
+                if not info_df.empty:
+                    bday_str = info_df.iloc[0].get("BIRTHDATE", None)
+                    position = info_df.iloc[0].get("POSITION", None)
+                    if bday_str:
+                        bday = datetime.strptime(str(bday_str)[:10], "%Y-%m-%d").date()
+                        with conn.cursor() as cur:
+                            cur.execute(
+                                "UPDATE players SET birthdate = %s, position = %s WHERE id = %s",
+                                (bday, position, pid),
+                            )
+                fetched += 1
+                if fetched % 50 == 0:
+                    conn.commit()
+                    log.info("  ...fetched %d / %d birthdates", fetched, len(missing_bdays))
+            except Exception:
+                log.debug("Failed to fetch info for player %s", ext_id)
 
-    conn.commit()
-    log.info("Fetched %d birthdates", fetched)
+        conn.commit()
+        log.info("Fetched %d birthdates", fetched)
 
 
 def sync_game_logs(conn, season_id: int, season_label: str):

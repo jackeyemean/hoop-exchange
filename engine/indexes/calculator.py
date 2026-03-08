@@ -2,6 +2,8 @@ import logging
 import os
 from datetime import date
 
+from psycopg2.extras import execute_values
+
 log = logging.getLogger(__name__)
 
 DEBUG_INDEXES = os.environ.get("DEBUG_INDEXES", "").lower() == "1"
@@ -92,7 +94,7 @@ def _get_rookie_external_ids(conn, season_id: int) -> set[str]:
     try:
         from nba_api.stats.endpoints import DraftHistory
         import time
-        time.sleep(0.5)  # Rate limit
+        time.sleep(0.3)  # Rate limit
         resp = DraftHistory(season_year_nullable=draft_year)
         df = resp.get_data_frames()[0]
         return {str(r["PERSON_ID"]) for _, r in df.iterrows()}
@@ -101,7 +103,7 @@ def _get_rookie_external_ids(conn, season_id: int) -> set[str]:
         return set()
 
 
-def rebalance_indexes(conn, season_id: int, trade_date: date, debug: bool = False):
+def rebalance_indexes(conn, season_id: int, trade_date: date, debug: bool = False, rookie_external_ids: set[str] | None = None, season_start: date | None = None, indexes: list | None = None, commit: bool = True):
     debug = debug or DEBUG_INDEXES
     log.info("Rebalancing indexes for season %d on %s", season_id, trade_date)
 
@@ -164,20 +166,22 @@ def rebalance_indexes(conn, season_id: int, trade_date: date, debug: bool = Fals
             "games_played": games_played.get(ps_id, 0),
         }
 
-    rookie_external_ids = _get_rookie_external_ids(conn, season_id)
+    if rookie_external_ids is None:
+        rookie_external_ids = _get_rookie_external_ids(conn, season_id)
 
     # Season start for IPO reset: when prev comes from a different season, IPO starts at 1000.
-    season_start = None
-    with conn.cursor() as cur:
-        cur.execute("SELECT start_date FROM seasons WHERE id = %s", (season_id,))
-        row = cur.fetchone()
-        if row and row[0]:
-            d = row[0]
-            season_start = d.date() if hasattr(d, "date") else d
+    if season_start is None:
+        with conn.cursor() as cur:
+            cur.execute("SELECT start_date FROM seasons WHERE id = %s", (season_id,))
+            row = cur.fetchone()
+            if row and row[0]:
+                d = row[0]
+                season_start = d.date() if hasattr(d, "date") else d
 
-    with conn.cursor() as cur:
-        cur.execute("SELECT id, name, index_type, team_id FROM indexes")
-        indexes = cur.fetchall()
+    if indexes is None:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, name, index_type, team_id FROM indexes")
+            indexes = cur.fetchall()
 
     # Per-index prev level: use each index's most recent level before trade_date.
     # Previously we used a global "previous date" - if an index was skipped that day
@@ -220,8 +224,20 @@ def rebalance_indexes(conn, season_id: int, trade_date: date, debug: bool = Fals
             else:
                 cur.execute("DELETE FROM index_constituents WHERE index_id = %s", (idx_id,))
 
-        for ps_id, weight in capped.items():
-            _upsert_constituent(conn, idx_id, ps_id, weight)
+            # Batch upsert all constituents (was N round-trips, now 1)
+            if capped:
+                values = [(idx_id, ps_id, round(weight, 6)) for ps_id, weight in capped.items()]
+                execute_values(
+                    cur,
+                    """
+                    INSERT INTO index_constituents (index_id, player_season_id, weight, updated_at)
+                    VALUES %s
+                    ON CONFLICT (index_id, player_season_id) DO UPDATE SET
+                        weight = EXCLUDED.weight, updated_at = NOW()
+                    """,
+                    values,
+                    template="(%s, %s, %s, NOW())",
+                )
 
         weighted_return = sum(
             capped[ps_id] * all_prices[ps_id]["change_pct"]
@@ -289,7 +305,8 @@ def rebalance_indexes(conn, season_id: int, trade_date: date, debug: bool = Fals
             "level": round(level, 4), "change_pct": round(change_pct, 4) if change_pct is not None else None,
         })
 
-    conn.commit()
+    if commit:
+        conn.commit()
     log.info("Rebalanced %d indexes", len(index_results))
 
 
@@ -351,18 +368,4 @@ def _select_constituents(all_prices: dict, idx_type: str, team_id: int | None,
         return [ps_id for ps_id, info in all_prices.items() if info["position"] in valid_positions]
 
     return []
-
-
-def _upsert_constituent(conn, index_id: int, player_season_id: int, weight: float):
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO index_constituents (index_id, player_season_id, weight, updated_at)
-            VALUES (%s, %s, %s, NOW())
-            ON CONFLICT (index_id, player_season_id) DO UPDATE SET
-                weight = EXCLUDED.weight, updated_at = NOW()
-            """,
-            (index_id, player_season_id, round(weight, 6)),
-        )
-
 

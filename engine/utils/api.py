@@ -10,7 +10,7 @@ log = logging.getLogger(__name__)
 
 # Max retries for transient failures (timeouts, connection errors)
 MAX_RETRIES = 4
-RETRY_BACKOFF = 3  # seconds, doubles each attempt
+RETRY_BACKOFF = 2  # seconds, doubles each attempt
 # Longer timeout for GitHub Actions / cloud runners
 REQUEST_TIMEOUT = 120
 
