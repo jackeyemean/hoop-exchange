@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jacky/hoop-exchange/backend/internal/model"
@@ -29,6 +30,30 @@ type PlayerWithPrice struct {
 	Price            *float64 `json:"price"`
 	ChangePct        *float64 `json:"changePct"`
 	MarketCap        *float64 `json:"marketCap"`
+	SeasonChangePct  *float64 `json:"seasonChangePct"`
+}
+
+type SeasonStatus struct {
+	IsOffSeason bool
+	Label       string
+	EndDate     string
+}
+
+func (r *PlayerRepository) GetCurrentSeasonStatus(ctx context.Context) (*SeasonStatus, error) {
+	var label string
+	var endDate time.Time
+	var isActive bool
+	err := r.Pool.QueryRow(ctx,
+		`SELECT label, end_date, is_active FROM seasons ORDER BY start_date DESC LIMIT 1`,
+	).Scan(&label, &endDate, &isActive)
+	if err != nil {
+		return nil, fmt.Errorf("get season status: %w", err)
+	}
+	return &SeasonStatus{
+		IsOffSeason: !isActive,
+		Label:       label,
+		EndDate:     endDate.Format("2006-01-02"),
+	}, nil
 }
 
 type PlayerRepository struct {
@@ -94,7 +119,7 @@ func (r *PlayerRepository) GetPlayerSeasonByID(ctx context.Context, id int) (*mo
 }
 
 func (r *PlayerRepository) ListActiveWithPrices(ctx context.Context, seasonID int) ([]PlayerWithPrice, error) {
-	// change_pct: (today - yesterday) / yesterday. When equal (no games), correctly shows 0%.
+	// change_pct: day-over-day. season_change_pct: first price row vs latest (full season return).
 	rows, err := r.Pool.Query(ctx,
 		`SELECT ps.id, p.first_name, p.last_name, COALESCE(p.position, ''), t.abbreviation,
 		        ps.tier::text, ps.float_shares, ps.status::text,
@@ -103,7 +128,11 @@ func (r *PlayerRepository) ListActiveWithPrices(ctx context.Context, seasonID in
 		             THEN ROUND((ph.price - prev_row.price)::numeric / prev_row.price, 6)
 		             ELSE NULL
 		        END AS change_pct,
-		        ph.market_cap
+		        ph.market_cap,
+		        CASE WHEN first_row.price IS NOT NULL AND first_row.price > 0
+		             THEN ROUND((ph.price - first_row.price)::numeric / first_row.price, 6)
+		             ELSE NULL
+		        END AS season_change_pct
 		 FROM player_seasons ps
 		 JOIN players p ON p.id = ps.player_id
 		 JOIN teams t ON t.id = ps.team_id
@@ -120,6 +149,12 @@ func (r *PlayerRepository) ListActiveWithPrices(ctx context.Context, seasonID in
 		     ORDER BY trade_date DESC
 		     OFFSET 1 LIMIT 1
 		 ) prev_row ON true
+		 LEFT JOIN LATERAL (
+		     SELECT price FROM price_history
+		     WHERE player_season_id = ps.id
+		     ORDER BY trade_date ASC
+		     LIMIT 1
+		 ) first_row ON true
 		 WHERE ps.season_id = $1 AND ps.status NOT IN ('delisted')
 		 ORDER BY ph.market_cap DESC NULLS LAST`,
 		seasonID,
@@ -135,7 +170,7 @@ func (r *PlayerRepository) ListActiveWithPrices(ctx context.Context, seasonID in
 		err := rows.Scan(
 			&p.ID, &p.FirstName, &p.LastName, &p.Position, &p.TeamAbbreviation,
 			&p.Tier, &p.FloatShares, &p.Status,
-			&p.Price, &p.ChangePct, &p.MarketCap,
+			&p.Price, &p.ChangePct, &p.MarketCap, &p.SeasonChangePct,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan player with price: %w", err)

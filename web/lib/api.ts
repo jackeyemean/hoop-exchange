@@ -113,6 +113,13 @@ class ApiClient {
     );
   }
 
+  // Market
+  getMarketStatus() {
+    return this.request<{ isOffSeason: boolean; seasonLabel: string; seasonEnd: string }>(
+      "/api/market/status"
+    );
+  }
+
   // Leaderboard
   getLeaderboard() {
     return this.request<{ entries: any[] }>("/api/leaderboard");

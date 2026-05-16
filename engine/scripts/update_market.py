@@ -69,6 +69,17 @@ def main(season: str, trade_date_str: str | None):
             trade_date = market_date_today()
             log.info("Trade date: %s (ET)", trade_date)
 
+        season_end = s["end_date"]
+        if hasattr(season_end, "date"):
+            season_end = season_end.date()
+        if trade_date > season_end:
+            log.info(
+                "Trade date %s is after the %s regular season end (%s). "
+                "Skipping price update — market is frozen until next season.",
+                trade_date, season, season_end,
+            )
+            return
+
         sync_teams(conn)
 
         count = run_update_for_date(conn, season_id, season, trade_date)

@@ -277,16 +277,71 @@ To match the market cap of a player in the tier above you, you need this much hi
 
 ## Trading Days and Game Inclusion
 
-- **Trading days:** Every day. Prices update once per day at 6:00 AM ET.
+- **Trading days:** Every day during the regular season. Prices update once per day at 6:00 AM ET.
 - **Games included:** For a given trading day, we include **all games** with `game_date ≤ trade_date`.
+- **Playoffs and off-season:** Playoff games are **not** used in the formula. Prices are frozen at their regular season closing values (see Off-Season below).
 
 ---
 
 ## Market Hours
 
-Prices update at **6:00 AM ET** daily. Trading hours:
+Prices update at **6:00 AM ET** daily during the regular season. Trading hours:
 - **Weekdays:** 6:00 AM – 6:00 PM ET
 - **Weekends:** 6:00 AM – 1:00 PM ET
+
+---
+
+## Season Lifecycle and Off-Season
+
+### Regular season end
+
+When the NBA regular season concludes, the `seasons` table is updated:
+
+```sql
+UPDATE seasons SET end_date = '<last game date>', is_active = FALSE WHERE label = '2025-26';
+```
+
+This single flag drives all off-season behavior across the stack.
+
+### What happens to prices
+
+Prices are **frozen at their regular season closing values**. The daily engine (`update_market.py`) checks `seasons.end_date` before running and exits early if today is past that date:
+
+```
+Trade date 2026-04-15 is after the 2025-26 regular season end (2026-04-12).
+Skipping price update — market is frozen until next season.
+```
+
+No new `price_history` rows are written. No index rebalancing occurs. The cron job can remain enabled without causing any drift.
+
+### Stale data cleanup
+
+If the engine ran during playoffs or the off-season before this guard was in place, use the following to remove bad rows and any playoff `game_stats` that were ingested:
+
+```sql
+DELETE FROM price_history WHERE trade_date > '2026-04-12';
+DELETE FROM index_history WHERE trade_date > '2026-04-12';
+DELETE FROM game_stats WHERE game_date > '2026-04-12';
+DELETE FROM leaderboard_snapshots WHERE snapshot_date > '2026-04-12';
+```
+
+### Frontend during off-season
+
+The frontend fetches `GET /api/market/status`, which reads `is_active` from the `seasons` table. When `is_active = FALSE`:
+
+- **Off-season modal:** A dismissible banner appears once per off-season (stored in `localStorage` keyed to the season label) explaining that prices are frozen and trading is paused until the next season.
+- **Season Best / Season Worst:** The home page movers widget switches from daily gainers/losers to full-season performance leaders and laggards. This uses `seasonChangePct` — the percentage change from a player's **first** `price_history` row of the season to their **last** (regular season closing price). Users can still browse any player's chart to see how their stock moved across the full season.
+- **Discover page:** The subtitle updates to indicate prices are final regular season values, not live.
+
+The modal auto-dismisses for users who have already seen it, and will reappear automatically when the `seasonLabel` changes (i.e., when the 2026-27 season is set up).
+
+### Starting a new season
+
+When the new season is ready:
+
+1. Run the bootstrap simulation (`restart_simulation.py`) to set tiers, float shares, and seed prices for 2026-27.
+2. Insert a new row into `seasons` with `is_active = TRUE`.
+3. The engine guard will pass from that point forward, and the frontend will show live prices again automatically.
 
 ---
 

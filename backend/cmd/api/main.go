@@ -57,6 +57,7 @@ func main() {
 	portfolioH := handler.NewPortfolioHandler(portfolioSvc, orderRepo, tradeRepo)
 	indexH := handler.NewIndexHandler(indexRepo)
 	leaderboardH := handler.NewLeaderboardHandler(leaderboardRepo)
+	marketH := handler.NewMarketHandler(playerRepo)
 
 	r := gin.Default()
 
@@ -78,6 +79,8 @@ func main() {
 
 	api := r.Group("/api")
 	{
+		api.GET("/market/status", marketH.GetStatus)
+
 		api.GET("/players", playerH.ListActive)
 		api.GET("/players/:id", playerH.GetDetail)
 

@@ -17,6 +17,14 @@ export default function DiscoverPage() {
     queryFn: () => api.getPlayers(),
   });
 
+  const { data: marketStatus } = useQuery({
+    queryKey: ["marketStatus"],
+    queryFn: () => api.getMarketStatus(),
+    staleTime: 1000 * 60 * 60,
+  });
+
+  const isOffSeason = marketStatus?.isOffSeason ?? false;
+
   const allPlayers = (data?.players || []).filter(
     (p: any) => p.price != null && p.price > 0
   );
@@ -33,14 +41,17 @@ export default function DiscoverPage() {
       return b.marketCap - a.marketCap;
     });
 
+  // During off-season show season-long best/worst; during season show daily movers.
+  const changePctKey = isOffSeason ? "seasonChangePct" : "changePct";
+
   const topGainers = [...allPlayers]
-    .filter((p: any) => (p.changePct ?? 0) > 0)
-    .sort((a: any, b: any) => (b.changePct ?? 0) - (a.changePct ?? 0))
+    .filter((p: any) => (p[changePctKey] ?? 0) > 0)
+    .sort((a: any, b: any) => (b[changePctKey] ?? 0) - (a[changePctKey] ?? 0))
     .slice(0, 10);
 
   const topLosers = [...allPlayers]
-    .filter((p: any) => (p.changePct ?? 0) < 0)
-    .sort((a: any, b: any) => (a.changePct ?? 0) - (b.changePct ?? 0))
+    .filter((p: any) => (p[changePctKey] ?? 0) < 0)
+    .sort((a: any, b: any) => (a[changePctKey] ?? 0) - (b[changePctKey] ?? 0))
     .slice(0, 10);
 
   const movers = moversTab === "gainers" ? topGainers : topLosers;
@@ -57,13 +68,20 @@ export default function DiscoverPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Discover</h1>
         <p className="mt-1 text-sm text-neutral-500">
-          Browse all player stocks. Prices update daily at 6:00 AM ET.
+          {isOffSeason
+            ? `${marketStatus?.seasonLabel ?? ""} regular season final prices. Market reopens next season.`
+            : "Browse all player stocks. Prices update daily at 6:00 AM ET."}
         </p>
       </div>
 
-      {/* Top Gainers / Top Losers */}
+      {/* Season Best/Worst (off-season) or Top Gainers/Losers (in-season) */}
       {!isLoading && !error && (topGainers.length > 0 || topLosers.length > 0) && (
         <div className="mb-6">
+          {isOffSeason && (
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-400">
+              {marketStatus?.seasonLabel} Season Performance
+            </p>
+          )}
           <div className="mb-3 flex justify-start">
             <div className="flex gap-1 rounded-md p-0.5">
               {(["gainers", "losers"] as const).map((tab) => (
@@ -76,7 +94,13 @@ export default function DiscoverPage() {
                       : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
                   }`}
                 >
-                  Top {tab === "gainers" ? "Gainers" : "Losers"}
+                  {isOffSeason
+                    ? tab === "gainers"
+                      ? "Season Best"
+                      : "Season Worst"
+                    : tab === "gainers"
+                    ? "Top Gainers"
+                    : "Top Losers"}
                 </button>
               ))}
             </div>
@@ -100,8 +124,8 @@ export default function DiscoverPage() {
                 <div className="mt-1 text-sm text-neutral-500">
                   {formatCurrency(p.price)}
                 </div>
-                <div className={`mt-0.5 text-sm font-medium ${pctColor(p.changePct)}`}>
-                  {formatPct(p.changePct)}
+                <div className={`mt-0.5 text-sm font-medium ${pctColor(p[changePctKey])}`}>
+                  {formatPct(p[changePctKey])}
                 </div>
               </Link>
             ))}
